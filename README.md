@@ -1,8 +1,8 @@
-# GallopIT: Sistema de Cavalariça Inteligente IoT
+# GallopIT: Sistema de Cavalariça Inteligente IoT (v2.2)
 
-Este repositório contém a documentação técnica, especificações e o código fonte para o **GallopIT**, um sistema inteligente e automatizado para gestão de baias (boxes) em cavalariças modernas.
+Este repositório contém a documentação técnica, especificações, o firmware completo e os utilitários de teste para o **GallopIT**, um sistema inteligente e automatizado para gestão de baias (boxes) em cavalariças modernas.
 
-O GallopIT combina hardware IoT de alta fiabilidade (ESP32) com um painel de controlo web minimalista, robusto, responsivo e escalável.
+O GallopIT combina hardware IoT de alta fiabilidade (ESP32 com relés Active-LOW de 4 segundos e proteção contra brownout) com um protocolo MQTT multi-tenant seguro e uma especificação completa para interfaces web modernas.
 
 ---
 
@@ -10,45 +10,71 @@ O GallopIT combina hardware IoT de alta fiabilidade (ESP32) com um painel de con
 
 ```text
 Projeto-GallopIT/
-├── README.md                  # Visão geral e guia rápido do sistema GallopIT
+├── README.md                      # Visão geral e guia do projeto GallopIT v2.2
 ├── docs/
-│   └── manual_utilizador.md   # Manual de utilizador e guia de especificação técnico v2.1
-├── web/
-│   └── README.md              # Requisitos para o Dashboard Web
+│   ├── manual_utilizador.md       # Manual técnico e especificações operacionais v2.2
+│   ├── prompt_google_ai_studio.md # Prompt Mestre para geração da Web App no Google AI Studio
+│   └── business_plan.md           # Plano de negócios e modelo de subscrição SaaS
 ├── firmware/
-│   ├── platformio.ini         # Configuração de compilação PlatformIO para ESP32
+│   ├── platformio.ini             # Configuração de compilação PlatformIO (ArduinoJson v7)
 │   └── src/
-│       ├── config.h           # Definição de pinos, segredos de setup e Wi-Fi
-│       └── main.cpp           # Firmware C++ completo (NVS, MQTT, LWT, 4s Solenoide)
+│       ├── config.h               # Pinos, segredos de setup, Active-LOW e tempos de pulso
+│       └── main.cpp               # Firmware C++ completo (NVS, MQTT 1024B, Latch, LWT)
+├── Python-Tester/
+│   ├── README.md                  # Instruções de utilização do utilitário de teste
+│   └── gallopit_tester.py         # Script interativo Python para monitorização e validação de hardware
 └── mqtt/
-    └── README.md              # Configurações e definições do broker MQTT
+    └── README.md                  # Especificação e definições do broker MQTT
 ```
 
 ---
 
-## 🛠️ Modos de Operação (Resumo)
+## 🛠️ Funcionalidades Principais (v2.2)
 
-O sistema opera sob 4 modos fundamentais acessíveis pelo painel web:
-1. **Controlo Manual:** Abertura imediata de boxes individuais com pulso seguro de 4 segundos.
-2. **Sequência Diária (Modo Delay):** Abertura sequencial coordenada das boxes (Box 1 à 4) com intervalos de atraso configuráveis.
-3. **Agendamento:** Definição de horários diários recorrentes (Hora:Minuto) por box, sincronizados via internet (NTP).
-4. **Histórico & Sistema:** Supervisão de auditoria (quem abriu e quando) e definição de modo padrão de fallback.
+1. **Estado Lógico Latch (ARMADA vs ABERTA):**
+   * Quando uma box é acionada (4 segundos de relé), o hardware marca o estado como **`ABERTA`** e guarda essa informação na memória flash permanente (**NVS Flash**).
+   * O estado permanece **`ABERTA`** (mesmo se a placa for desligada) até que o utilizador/tratador feche a baia e envie o comando de **Armar** (`cmd/arm`).
+
+2. **Proteção Eletrónica & Hardware:**
+   * **Active-LOW Relay Control:** Garante que os relés permanecem completamente desligados durante o boot e arranque do microcontrolador.
+   * **Brownout Detector Suppression:** Impede resets pânico causados por quedas temporárias de voltagem ao inicializar a antena Wi-Fi.
+   * **Pulso Seguro de 4 Segundos:** Desativa a corrente das bobinas solenoides automaticamente ao fim de 4s para evitar aquecimento.
+
+3. **Setup Inicial Seguro & Autenticação:**
+   * Provisionamento fabril via tópico `gallopit/setup/{MAC_ADDRESS}/config` autenticado por `secret_key` (`GALLOPIT_SECURE_AUTH_KEY_2026`).
+
+4. **Verificação de Conexão (PING / Heartbeat):**
+   * Resposta instantânea ao comando `cmd/ping` com retenção de presença (`online` / `offline`).
 
 ---
 
-## 🔒 Setup Inicial Seguro & Protocolo MQTT
+## 📡 Referência Rápida do Protocolo MQTT
 
-Toda a comunicação entre a interface web e o armário físico é efetuada através do protocolo MQTT com suporte a **Setup Inicial Seguro** autenticado por Chave Secreta (`secret_key`):
+Tópico base: `gallopit/{client_id}/{machine_id}/{direcao}/{acao}`
 
-* **Tópico de Setup Fabril:** `gallopit/setup/{MAC_ADDRESS}/config`
-  * **Payload:** `{"secret_key": "GALLOPIT_SECURE_AUTH_KEY_2026", "client_id": "haras_x", "machine_id": "box_01"}`
-* **Tópicos de Comando:** `gallopit/{client_id}/{machine_id}/cmd/open`, `gallopit/{client_id}/{machine_id}/cmd/mode`, `gallopit/{client_id}/{machine_id}/cmd/schedule`
-* **Tópicos de Status:** `gallopit/{client_id}/{machine_id}/status/presence` (LWT: `"online"`/`"offline"`), `gallopit/{client_id}/{machine_id}/status/state`, `gallopit/{client_id}/{machine_id}/status/event`
+| Tipo | Tópico | Payload | Função |
+| :--- | :--- | :--- | :--- |
+| **Cmd** | `.../cmd/open` | `{"box": 1}` ou `{"box": "all"}` | Dispara solenoide 4s + marca `ABERTA`. |
+| **Cmd** | `.../cmd/arm` | `{"box": 1}` ou `{"box": "all"}` | Re-arma a prateleira + marca `ARMADA`. |
+| **Cmd** | `.../cmd/ping` | `{}` | Testa ligação e obtém resposta `PONG`. |
+| **Cmd** | `.../cmd/status_get` | `{}` | Solicita estado completo em `status/state`. |
+| **Status** | `.../status/presence` | `"online"` / `"offline"` | Presença LWT (Retained). |
+| **Status** | `.../status/state` | JSON Completo (Retained) | Lista das 4 boxes, RSSI, modo e status `ARMADA`/`ABERTA`. |
 
 ---
 
 ## 🚀 Como Iniciar
 
-1. **Firmware:** Abrir a pasta `firmware` no **PlatformIO / VS Code** e carregar para o ESP32.
-2. **Setup:** Enviar o JSON de provisionamento inicial com a `secret_key` para a máquina gravar em memória permanente.
-3. **Docs:** Consultar o [Manual do Utilizador](docs/manual_utilizador.md) para detalhes completos de utilização.
+### 1. Gravar o Firmware na ESP32
+Carregar o código contido em `firmware/` utilizando o **PlatformIO** (VS Code).
+
+### 2. Validar o Hardware com o Python-Tester
+No terminal, execute:
+```bash
+cd Python-Tester
+python gallopit_tester.py
+```
+Use o menu numérico para testar o setup seguro, a abertura individual das 4 boxes, o armamento e o PING.
+
+### 3. Criar a Web App no Google AI Studio
+Copie o conteúdo de [`docs/prompt_google_ai_studio.md`](docs/prompt_google_ai_studio.md) para o Google AI Studio para gerar a interface gráfica completa.
