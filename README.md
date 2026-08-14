@@ -1,24 +1,25 @@
-# EquiLock: Sistema de Cavalariça Inteligente IoT
+# GallopIT: Sistema de Cavalariça Inteligente IoT
 
-Este repositório contém a documentação técnica, especificações e, futuramente, o código fonte para o **EquiLock**, um sistema inteligente e automatizado para gestão de baias (boxes) em cavalariças modernas.
+Este repositório contém a documentação técnica, especificações e o código fonte para o **GallopIT**, um sistema inteligente e automatizado para gestão de baias (boxes) em cavalariças modernas.
 
-O EquiLock combina hardware IoT de alta fiabilidade com um painel de controlo web minimalista, robusto e responsivo.
+O GallopIT combina hardware IoT de alta fiabilidade (ESP32) com um painel de controlo web minimalista, robusto, responsivo e escalável.
 
 ---
 
 ## 📁 Estrutura do Repositório
 
-Esta é a estrutura inicial organizada para facilitar o desenvolvimento e a sincronização com o seu novo computador:
-
 ```text
-Project-GallopIT/
-├── README.md                  # Este ficheiro com a visão geral do projeto
+Projeto-GallopIT/
+├── README.md                  # Visão geral e guia rápido do sistema GallopIT
 ├── docs/
-│   └── manual_utilizador.md   # Manual de utilizador e guia de operação completo (v1.3)
+│   └── manual_utilizador.md   # Manual de utilizador e guia de especificação técnico v2.1
 ├── web/
-│   └── README.md              # Diretório para o Dashboard Web (Frontend/Backend)
+│   └── README.md              # Requisitos para o Dashboard Web
 ├── firmware/
-│   └── README.md              # Diretório para o código do microcontrolador (ESP32/ESP8266, etc.)
+│   ├── platformio.ini         # Configuração de compilação PlatformIO para ESP32
+│   └── src/
+│       ├── config.h           # Definição de pinos, segredos de setup e Wi-Fi
+│       └── main.cpp           # Firmware C++ completo (NVS, MQTT, LWT, 4s Solenoide)
 └── mqtt/
     └── README.md              # Configurações e definições do broker MQTT
 ```
@@ -35,28 +36,19 @@ O sistema opera sob 4 modos fundamentais acessíveis pelo painel web:
 
 ---
 
-## 📡 Comunicação e Protocolo (MQTT)
+## 🔒 Setup Inicial Seguro & Protocolo MQTT
 
-Toda a comunicação entre a interface web e o armário físico é efetuada através do protocolo MQTT com tópicos dedicados de comando, configuração e status:
+Toda a comunicação entre a interface web e o armário físico é efetuada através do protocolo MQTT com suporte a **Setup Inicial Seguro** autenticado por Chave Secreta (`secret_key`):
 
-* **Tópicos de Comando:** `armario/comando/manutencao` (`"ON"`), `armario/comando/sequencia` (`"START"`), `armario/comando/status` (`"GET"`).
-* **Tópicos de Configuração:** `armario/config/modo` (`"DELAY"`/`"AGENDA"`), `armario/config/delay` (`{"minutos": X}`), `armario/config/agenda` (`{"prateleira": X, "hora": H, "minuto": M}`).
-* **Tópicos de Status:** `armario/status/conexao` (`"online"`/`"offline"` via LWT), `armario/status/notificacao`, `armario/status/atual` (JSON completo).
+* **Tópico de Setup Fabril:** `gallopit/setup/{MAC_ADDRESS}/config`
+  * **Payload:** `{"secret_key": "GALLOPIT_SECURE_AUTH_KEY_2026", "client_id": "haras_x", "machine_id": "box_01"}`
+* **Tópicos de Comando:** `gallopit/{client_id}/{machine_id}/cmd/open`, `gallopit/{client_id}/{machine_id}/cmd/mode`, `gallopit/{client_id}/{machine_id}/cmd/schedule`
+* **Tópicos de Status:** `gallopit/{client_id}/{machine_id}/status/presence` (LWT: `"online"`/`"offline"`), `gallopit/{client_id}/{machine_id}/status/state`, `gallopit/{client_id}/{machine_id}/status/event`
 
 ---
 
-## 🚀 Como Iniciar no Novo Computador
+## 🚀 Como Iniciar
 
-Para configurar e continuar o desenvolvimento neste repositório no seu computador portátil novo:
-
-### 1. Clonar o repositório
-```bash
-git clone https://github.com/jotadateta/GallopIT.git
-cd GallopIT
-```
-
-### 2. Fluxo de Trabalho Recomendado
-* **`/web`:** Desenvolver a aplicação do Dashboard (ex: utilizando HTML/CSS/JS puros ou uma framework como Next.js/Vite).
-* **`/firmware`:** Desenvolver o código das fechaduras (ex: C++ para ESP32 ou ESP8266 com bibliotecas WiFi e PubSubClient).
-* **`/docs`:** Consultar e expandir o [Manual de Utilizador](docs/manual_utilizador.md) sempre que necessário.
-
+1. **Firmware:** Abrir a pasta `firmware` no **PlatformIO / VS Code** e carregar para o ESP32.
+2. **Setup:** Enviar o JSON de provisionamento inicial com a `secret_key` para a máquina gravar em memória permanente.
+3. **Docs:** Consultar o [Manual do Utilizador](docs/manual_utilizador.md) para detalhes completos de utilização.

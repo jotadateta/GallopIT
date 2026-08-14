@@ -3,12 +3,16 @@
 
 #include <Arduino.h>
 
-// --- Identificadores Multi-Tenant (EquiLock v2.0) ---
-#define CLIENT_ID  "cliente_demo"
-#define MACHINE_ID "eq_demo_01"
+// --- Identificadores de Setup e Segurança (GallopIT v2.1) ---
+#define SYSTEM_PREFIX       "gallopit"
+#define PROVISIONING_SECRET "GALLOPIT_SECURE_AUTH_KEY_2026" // Chave secreta obrigatória para o setup inicial seguro
+
+// Valores por omissão (antes do provisionamento)
+#define DEFAULT_CLIENT_ID  "cliente_demo"
+#define DEFAULT_MACHINE_ID "eq_demo_01"
 
 // --- Definições de Pinos do ESP32 ---
-const int RELAY_PINS[4] = {18, 19, 21, 22}; // Pinos para as Boxes 1, 2, 3 e 4
+const int RELAY_PINS[4] = {18, 19, 21, 22}; // Pinos das Boxes 1, 2, 3 e 4
 const int LED_STATUS_PIN = 2;               // LED de sinalização de estado do armário
 
 // --- Temporizações de Segurança ---
@@ -29,8 +33,8 @@ const ConfigRede REDES[] = {
 const int NUM_REDES = sizeof(REDES) / sizeof(REDES[0]);
 
 // --- Configurações de MQTT ---
-const char* MQTT_SERVER = "test.mosquitto.org";
-const int MQTT_PORT = 1883;
+const char* DEFAULT_MQTT_SERVER = "test.mosquitto.org";
+const int DEFAULT_MQTT_PORT = 1883;
 
 // --- Servidor NTP para Agendamento Autónomo ---
 const char* NTP_SERVER = "pool.ntp.org";
