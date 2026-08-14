@@ -19,6 +19,10 @@
 #define AP_SETUP_SSID_PREFIX "GallopIT-Setup-"
 #define AP_SETUP_PASS        "gallopit123"
 
+// --- Lógica do Módulo de Relés ---
+// A maioria dos módulos de relés de 5V para Arduino/ESP32 é Active LOW (ativa com sinal LOW/0V)
+const bool RELAY_ACTIVE_LOW = true; 
+
 // --- Definições de Pinos do ESP32 ---
 const int RELAY_PINS[4] = {18, 19, 21, 22}; // Pinos das Boxes 1, 2, 3 e 4
 const int LED_STATUS_PIN = 2;               // LED de sinalização de estado do armário

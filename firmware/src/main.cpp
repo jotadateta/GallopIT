@@ -1,7 +1,7 @@
 /**
  * GallopIT Firmware v2.1 - ESP32
  * Sistema de Cavalariça Inteligente IoT
- * PlatformIO Build - Compatible with ArduinoJson v7 & Brownout Protection
+ * Suporte para Estado Lógico Latch (ARMADA vs ABERTA) com NVS, Ping/Pong e MQTT Multi-Tenant
  */
 
 #include <WiFi.h>
@@ -14,6 +14,10 @@
 #include "soc/soc.h"
 #include "soc/rtc_cntl_reg.h"
 #include "config.h"
+
+// Definição dos estados elétricos dos relés (Active LOW vs Active HIGH)
+const uint8_t RELAY_ON = RELAY_ACTIVE_LOW ? LOW : HIGH;
+const uint8_t RELAY_OFF = RELAY_ACTIVE_LOW ? HIGH : LOW;
 
 // --- Instância de Memória Permanente (NVS Flash) ---
 Preferences preferences;
@@ -38,15 +42,16 @@ unsigned long ledStateTimer = 0;
 unsigned long lastLedBlinkTimer = 0;
 bool ledToggleState = false;
 
-// --- Estrutura de Agendamento por Box ---
-struct BoxSchedule {
+// --- Estrutura de Agendamento e Estado Lógico por Box ---
+struct BoxState {
     int hora = -1;
     int minuto = -1;
     bool ativo = false;
     bool abertaHoje = false;
+    bool aberta = false; // true = ABERTA, false = ARMADA
 };
 
-BoxSchedule boxAgenda[4];
+BoxState boxes[4];
 
 // --- Variáveis de Configuração Dinâmica (NVS) ---
 String wifiSSID = DEFAULT_WIFI_SSID;
@@ -92,6 +97,7 @@ void publishDiscoveryAnnouncement();
 void publishFullState();
 void publishEvent(String evento, int boxNum, String origem, String msg);
 void triggerBoxOpen(int boxIndex, String origem);
+void armBox(int boxIndex, String origem);
 void handleLedStateMachine();
 void processSequenceLogic();
 void processAgendaLogic();
@@ -114,6 +120,12 @@ void loadStoredPreferences() {
     isProvisioned = preferences.getBool("provisioned", false);
     modoAtivo = preferences.getString("modo", "DELAY");
     intervaloDelayMinutos = preferences.getInt("delay_min", 5);
+
+    for (int i = 0; i < 4; i++) {
+        String key = "box_" + String(i + 1) + "_open";
+        boxes[i].aberta = preferences.getBool(key.c_str(), false);
+    }
+
     preferences.end();
 
     Serial.println(F("[NVS] Configurações carregadas:"));
@@ -132,6 +144,12 @@ void saveStoredPreferences() {
     preferences.putBool("provisioned", isProvisioned);
     preferences.putString("modo", modoAtivo);
     preferences.putInt("delay_min", intervaloDelayMinutos);
+
+    for (int i = 0; i < 4; i++) {
+        String key = "box_" + String(i + 1) + "_open";
+        preferences.putBool(key.c_str(), boxes[i].aberta);
+    }
+
     preferences.end();
     Serial.println(F("[NVS] Configurações guardadas com sucesso!"));
 }
@@ -156,7 +174,7 @@ bool connectToWiFi() {
     Serial.println(wifiSSID);
 
     WiFi.mode(WIFI_STA);
-    WiFi.setTxPower(WIFI_POWER_15dBm); // Reduz consumo elétrico da antena no arranque
+    WiFi.setTxPower(WIFI_POWER_15dBm);
 
     WiFi.begin(wifiSSID.c_str(), wifiPass.c_str());
 
@@ -318,10 +336,11 @@ void publishFullState() {
     for (int i = 0; i < 4; i++) {
         JsonObject b = boxesArr.add<JsonObject>();
         b["box"] = i + 1;
-        b["hora"] = boxAgenda[i].hora;
-        b["minuto"] = boxAgenda[i].minuto;
-        b["ativo"] = boxAgenda[i].ativo;
-        b["status"] = (relayStopTimes[i] > 0) ? "ABERTA" : "FECHADA";
+        b["hora"] = boxes[i].hora;
+        b["minuto"] = boxes[i].minuto;
+        b["ativo"] = boxes[i].ativo;
+        b["rele_ativo"] = (relayStopTimes[i] > 0);
+        b["status"] = boxes[i].aberta ? "ABERTA" : "ARMADA";
     }
 
     String output;
@@ -387,13 +406,28 @@ void triggerBoxOpen(int boxIndex, String origem) {
     if (boxIndex < 0 || boxIndex >= 4) return;
 
     Serial.print(F("[SOLENOIDE] Ativando Box ")); Serial.print(boxIndex + 1); Serial.println(F(" por 4s."));
-    digitalWrite(RELAY_PINS[boxIndex], HIGH);
+    digitalWrite(RELAY_PINS[boxIndex], RELAY_ON);
     relayStopTimes[boxIndex] = millis() + SOLENOID_PULSE_MS;
+
+    boxes[boxIndex].aberta = true;
+    saveStoredPreferences();
 
     currentLedState = LED_STATE_ACTIVE_4S;
     ledStateTimer = millis() + SOLENOID_PULSE_MS;
 
-    publishEvent("BOX_OPENED", boxIndex + 1, origem, "Fechadura ativada por 4 segundos.");
+    publishEvent("BOX_OPENED", boxIndex + 1, origem, "Fechadura ativada por 4 segundos. Estado marcado como ABERTA.");
+    publishFullState();
+}
+
+void armBox(int boxIndex, String origem) {
+    if (boxIndex == -1) {
+        for (int i = 0; i < 4; i++) boxes[i].aberta = false;
+        publishEvent("ALL_BOXES_ARMED", 0, origem, "Todas as boxes foram marcadas como ARMADAS.");
+    } else if (boxIndex >= 0 && boxIndex < 4) {
+        boxes[boxIndex].aberta = false;
+        publishEvent("BOX_ARMED", boxIndex + 1, origem, "Box marcada como ARMADA.");
+    }
+    saveStoredPreferences();
     publishFullState();
 }
 
@@ -452,6 +486,13 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
         } else if (!error && doc["box"].is<const char*>() && String(doc["box"].as<const char*>()) == "all") {
             for (int b = 0; b < 4; b++) triggerBoxOpen(b, "MANUAL_ALL");
         }
+    } else if (topicStr.endsWith("/cmd/arm")) {
+        if (!error && doc["box"].is<int>()) {
+            int b = doc["box"].as<int>() - 1;
+            armBox(b, "MANUAL_ARM");
+        } else if (!error && doc["box"].is<const char*>() && String(doc["box"].as<const char*>()) == "all") {
+            armBox(-1, "MANUAL_ARM_ALL");
+        }
     } else if (topicStr.endsWith("/cmd/mode")) {
         if (!error) {
             if (doc["modo"].is<const char*>() || doc["modo"].is<String>()) modoAtivo = doc["modo"].as<String>();
@@ -463,13 +504,18 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
         if (!error && doc["box"].is<int>()) {
             int b = doc["box"].as<int>() - 1;
             if (b >= 0 && b < 4) {
-                if (doc["hora"].is<int>()) boxAgenda[b].hora = doc["hora"].as<int>();
-                if (doc["minuto"].is<int>()) boxAgenda[b].minuto = doc["minuto"].as<int>();
-                if (doc["ativo"].is<bool>()) boxAgenda[b].ativo = doc["ativo"].as<bool>();
+                if (doc["hora"].is<int>()) boxes[b].hora = doc["hora"].as<int>();
+                if (doc["minuto"].is<int>()) boxes[b].minuto = doc["minuto"].as<int>();
+                if (doc["ativo"].is<bool>()) boxes[b].ativo = doc["ativo"].as<bool>();
                 publishFullState();
             }
         }
+    } else if (topicStr.endsWith("/cmd/ping")) {
+        client.publish(topicStatusPresence.c_str(), "online", true);
+        publishEvent("PONG", 0, "HEARTBEAT", "Equipamento online e a responder ao ping.");
+        publishFullState();
     } else if (topicStr.endsWith("/cmd/status_get")) {
+        client.publish(topicStatusPresence.c_str(), "online", true);
         publishFullState();
     }
 }
@@ -498,14 +544,14 @@ void processAgendaLogic() {
     if (!getLocalTime(&timeinfo)) return;
 
     for (int i = 0; i < 4; i++) {
-        if (boxAgenda[i].ativo && boxAgenda[i].hora == timeinfo.tm_hour && boxAgenda[i].minuto == timeinfo.tm_min) {
-            if (!boxAgenda[i].abertaHoje) {
+        if (boxes[i].ativo && boxes[i].hora == timeinfo.tm_hour && boxes[i].minuto == timeinfo.tm_min) {
+            if (!boxes[i].abertaHoje) {
                 triggerBoxOpen(i, "AGENDA_AUTOMATICA");
-                boxAgenda[i].abertaHoje = true;
+                boxes[i].abertaHoje = true;
             }
         }
         if (timeinfo.tm_hour == 0 && timeinfo.tm_min == 0) {
-            boxAgenda[i].abertaHoje = false;
+            boxes[i].abertaHoje = false;
         }
     }
 }
@@ -516,7 +562,7 @@ void setup() {
     Serial.begin(115200);
     delay(100);
     Serial.println(F("\n=============================================="));
-    Serial.println(F(" GallopIT Firmware v2.1 (Brownout Protected) "));
+    Serial.println(F(" GallopIT Firmware v2.2 (Latch & Ping Mode)   "));
     Serial.println(F("==============================================\n"));
 
     pinMode(LED_STATUS_PIN, OUTPUT);
@@ -524,7 +570,7 @@ void setup() {
 
     for (int i = 0; i < 4; i++) {
         pinMode(RELAY_PINS[i], OUTPUT);
-        digitalWrite(RELAY_PINS[i], LOW);
+        digitalWrite(RELAY_PINS[i], RELAY_OFF);
     }
 
     loadStoredPreferences();
@@ -556,9 +602,9 @@ void loop() {
     unsigned long now = millis();
     for (int i = 0; i < 4; i++) {
         if (relayStopTimes[i] > 0 && now >= relayStopTimes[i]) {
-            digitalWrite(RELAY_PINS[i], LOW);
+            digitalWrite(RELAY_PINS[i], RELAY_OFF);
             relayStopTimes[i] = 0;
-            Serial.print(F("[SOLENOIDE] Box ")); Serial.print(i + 1); Serial.println(F(" desligada (4s completos)."));
+            Serial.print(F("[SOLENOIDE] Relé da Box ")); Serial.print(i + 1); Serial.println(F(" desativado (4s)."));
             publishFullState();
         }
     }
