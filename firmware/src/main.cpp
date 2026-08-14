@@ -1,10 +1,12 @@
 /**
  * GallopIT Firmware v2.1 - ESP32
  * Sistema de Cavalariça Inteligente IoT
- * Suporte para Discovery Automático por MQTT, Setup Seguro & NVS Preferences
+ * Suporte para Setup de Wi-Fi (AP WebServer + Captive Portal), MQTT Setup Seguro & NVS
  */
 
 #include <WiFi.h>
+#include <WebServer.h>
+#include <DNSServer.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
@@ -14,13 +16,19 @@
 // --- Instância de Memória Permanente (NVS Flash) ---
 Preferences preferences;
 
+// --- WebServer e DNS para o Modo AP Setup Wi-Fi ---
+WebServer server(80);
+DNSServer dnsServer;
+bool isAPMode = false;
+
 // --- Estados do LED de Sinalização ---
 enum LedState {
     LED_STATE_OFF,
     LED_STATE_WIFI_CONNECTING,
     LED_STATE_READY_3S,
     LED_STATE_PRE_WARNING_5S,
-    LED_STATE_ACTIVE_4S
+    LED_STATE_ACTIVE_4S,
+    LED_STATE_AP_MODE
 };
 
 LedState currentLedState = LED_STATE_OFF;
@@ -39,6 +47,8 @@ struct BoxSchedule {
 BoxSchedule boxAgenda[4];
 
 // --- Variáveis de Configuração Dinâmica (NVS) ---
+String wifiSSID = DEFAULT_WIFI_SSID;
+String wifiPass = DEFAULT_WIFI_PASS;
 String clientId = DEFAULT_CLIENT_ID;
 String machineId = DEFAULT_MACHINE_ID;
 String macAddressClean = "";
@@ -72,6 +82,9 @@ void loadStoredPreferences();
 void saveStoredPreferences();
 void setupMQTTTopics();
 bool connectToWiFi();
+void startAPMode();
+void handleAPRoot();
+void handleAPSave();
 void reconnectMQTT();
 void publishDiscoveryAnnouncement();
 void publishFullState();
@@ -85,6 +98,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length);
 
 void loadStoredPreferences() {
     preferences.begin("gallopit", false);
+    wifiSSID = preferences.getString("wifi_ssid", DEFAULT_WIFI_SSID);
+    wifiPass = preferences.getString("wifi_pass", DEFAULT_WIFI_PASS);
     clientId = preferences.getString("client_id", DEFAULT_CLIENT_ID);
     machineId = preferences.getString("machine_id", DEFAULT_MACHINE_ID);
     isProvisioned = preferences.getBool("provisioned", false);
@@ -92,21 +107,24 @@ void loadStoredPreferences() {
     intervaloDelayMinutos = preferences.getInt("delay_min", 5);
     preferences.end();
 
-    Serial.println(F("[NVS] Configurações carregadas da memória permanente:"));
+    Serial.println(F("[NVS] Configurações carregadas:"));
+    Serial.print(F(" - Wi-Fi SSID: ")); Serial.println(wifiSSID);
     Serial.print(F(" - Client ID: ")); Serial.println(clientId);
     Serial.print(F(" - Machine ID: ")); Serial.println(machineId);
-    Serial.print(F(" - Provisionado: ")); Serial.println(isProvisioned ? "SIM" : "NAO (Aguardando Setup)");
+    Serial.print(F(" - Provisionado: ")); Serial.println(isProvisioned ? "SIM" : "NAO");
 }
 
 void saveStoredPreferences() {
     preferences.begin("gallopit", false);
+    preferences.putString("wifi_ssid", wifiSSID);
+    preferences.putString("wifi_pass", wifiPass);
     preferences.putString("client_id", clientId);
     preferences.putString("machine_id", machineId);
     preferences.setBool("provisioned", isProvisioned);
     preferences.putString("modo", modoAtivo);
     preferences.putInt("delay_min", intervaloDelayMinutos);
     preferences.end();
-    Serial.println(F("[NVS] Configurações guardadas na memória flash com sucesso."));
+    Serial.println(F("[NVS] Configurações guardadas com sucesso!"));
 }
 
 void setupMQTTTopics() {
@@ -114,11 +132,9 @@ void setupMQTTTopics() {
     mac.replace(":", "");
     macAddressClean = mac;
 
-    // Tópico de Setup Inicial Seguro
     topicSetupConfig = String(SYSTEM_PREFIX) + "/setup/" + macAddressClean + "/config";
     topicSetupStatus = String(SYSTEM_PREFIX) + "/setup/" + macAddressClean + "/status";
 
-    // Tópicos Operacionais Dinâmicos
     String base = String(SYSTEM_PREFIX) + "/" + clientId + "/" + machineId;
     topicCmd = base + "/cmd/#";
     topicStatusPresence = base + "/status/presence";
@@ -127,37 +143,105 @@ void setupMQTTTopics() {
 }
 
 bool connectToWiFi() {
-    Serial.println(F("[WiFi] A procurar redes guardadas..."));
+    Serial.print(F("[WiFi] A tentar conectar a: "));
+    Serial.println(wifiSSID);
+
     WiFi.mode(WIFI_STA);
+    WiFi.begin(wifiSSID.c_str(), wifiPass.c_str());
+
     currentLedState = LED_STATE_WIFI_CONNECTING;
+    int retries = 60; // 6 segundos
 
-    for (int i = 0; i < NUM_REDES; i++) {
-        Serial.print(F("[WiFi] Tentativa em: "));
-        Serial.println(REDES[i].ssid);
-
-        WiFi.begin(REDES[i].ssid, REDES[i].password);
-
-        int retries = 50; // 5 segundos
-        while (WiFi.status() != WL_CONNECTED && retries > 0) {
-            handleLedStateMachine();
-            delay(100);
-            retries--;
-        }
-
-        if (WiFi.status() == WL_CONNECTED) {
-            Serial.println(F("[WiFi] Conetado com sucesso!"));
-            Serial.print(F("[WiFi] Endereço IP: ")); Serial.println(WiFi.localIP());
-            Serial.print(F("[WiFi] MAC Address: ")); Serial.println(WiFi.macAddress());
-
-            configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
-            return true;
-        }
-        WiFi.disconnect();
+    while (WiFi.status() != WL_CONNECTED && retries > 0) {
+        handleLedStateMachine();
+        delay(100);
+        retries--;
     }
 
-    Serial.println(F("[WiFi] Falha ao conetar a todas as redes."));
-    currentLedState = LED_STATE_OFF;
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println(F("[WiFi] Conectado com sucesso!"));
+        Serial.print(F("[WiFi] Endereço IP: ")); Serial.println(WiFi.localIP());
+        Serial.print(F("[WiFi] MAC Address: ")); Serial.println(WiFi.macAddress());
+
+        configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
+        isAPMode = false;
+        return true;
+    }
+
+    Serial.println(F("[WiFi] Falha ao conectar. Iniciando Portal de Setup AP Wi-Fi..."));
+    startAPMode();
     return false;
+}
+
+void startAPMode() {
+    isAPMode = true;
+    currentLedState = LED_STATE_AP_MODE;
+
+    String apName = String(AP_SETUP_SSID_PREFIX) + macAddressClean;
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(apName.c_str(), AP_SETUP_PASS);
+
+    IPAddress apIP(192, 168, 4, 1);
+    WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
+
+    dnsServer.start(53, "*", apIP);
+
+    server.on("/", HTTP_GET, handleAPRoot);
+    server.on("/save", HTTP_POST, handleAPSave);
+    server.onNotFound(handleAPRoot);
+    server.begin();
+
+    Serial.println(F("[AP SETUP] Portal Wi-Fi ativo!"));
+    Serial.print(F(" Redes Wi-Fi criadas: ")); Serial.println(apName);
+    Serial.print(F(" Palavra-passe do AP: ")); Serial.println(AP_SETUP_PASS);
+    Serial.println(F(" Aceda a http://192.168.4.1 no seu smartphone para configurar o Wi-Fi."));
+}
+
+void handleAPRoot() {
+    String html = "<html><head><meta name='viewport' content='width=device-width, initial-scale=1'>"
+                  "<style>body{font-family:Arial;background:#f4f6f9;padding:20px;color:#333}"
+                  ".card{background:#fff;border-radius:12px;padding:24px;max-width:400px;margin:auto;box-shadow:0 4px 12px rgba(0,0,0,0.1)}"
+                  "h2{color:#2d3748;margin-top:0}input{width:100%;padding:12px;margin:8px 0 16px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box}"
+                  "button{width:100%;background:#10b981;color:#fff;padding:12px;border:none;border-radius:6px;font-size:16px;font-weight:bold;cursor:pointer}"
+                  "</style></head><body><div class='card'>"
+                  "<h2>GallopIT - Setup Wi-Fi</h2>"
+                  "<form action='/save' method='POST'>"
+                  "<label>Nome da Rede Wi-Fi (SSID):</label>"
+                  "<input type='text' name='ssid' value='" + wifiSSID + "' required>"
+                  "<label>Palavra-passe do Wi-Fi:</label>"
+                  "<input type='password' name='pass' value='" + wifiPass + "'>"
+                  "<label>Chave Secreta de Auth (Secret Key):</label>"
+                  "<input type='password' name='secret' value=''>"
+                  "<label>ID do Cliente (Opcional):</label>"
+                  "<input type='text' name='client' value='" + clientId + "'>"
+                  "<label>ID da Máquina (Opcional):</label>"
+                  "<input type='text' name='machine' value='" + machineId + "'>"
+                  "<button type='submit'>Guardar e Reiniciar</button>"
+                  "</form></div></body></html>";
+
+    server.send(200, "text/html", html);
+}
+
+void handleAPSave() {
+    if (server.hasArg("ssid")) wifiSSID = server.arg("ssid");
+    if (server.hasArg("pass")) wifiPass = server.arg("pass");
+    if (server.hasArg("client") && server.arg("client").length() > 0) clientId = server.arg("client");
+    if (server.hasArg("machine") && server.arg("machine").length() > 0) machineId = server.arg("machine");
+
+    if (server.hasArg("secret") && server.arg("secret") == String(PROVISIONING_SECRET)) {
+        isProvisioned = true;
+    }
+
+    saveStoredPreferences();
+
+    String html = "<html><body style='font-family:Arial;text-align:center;padding:40px'>"
+                  "<h2>Configurações Guardadas!</h2>"
+                  "<p>A ESP32 vai reiniciar e conectar-se à rede Wi-Fi configurada.</p>"
+                  "</body></html>";
+    server.send(200, "text/html", html);
+
+    delay(2000);
+    ESP.restart();
 }
 
 void publishDiscoveryAnnouncement() {
@@ -172,7 +256,7 @@ void publishDiscoveryAnnouncement() {
     String output;
     serializeJson(doc, output);
     client.publish(topicDiscovery.c_str(), output.c_str());
-    Serial.println(F("[DISCOVERY] Anúncio de nova máquina enviado para gallopit/discovery/announcement!"));
+    Serial.println(F("[DISCOVERY] Anúncio enviado para gallopit/discovery/announcement!"));
 }
 
 void reconnectMQTT() {
@@ -186,17 +270,12 @@ void reconnectMQTT() {
             Serial.println(F("[MQTT] Ligado com sucesso!"));
 
             client.publish(topicStatusPresence.c_str(), "online", true);
-
-            // Subscreve ao tópico de Setup Seguro
             client.subscribe(topicSetupConfig.c_str());
-
-            // Subscreve aos tópicos de comando operacionais
             client.subscribe(topicCmd.c_str());
 
             currentLedState = LED_STATE_READY_3S;
             ledStateTimer = millis() + 3000;
 
-            // Anuncia a sua presença para a consola do Developer se ainda não estiver provisionada
             if (!isProvisioned) {
                 publishDiscoveryAnnouncement();
             }
@@ -267,6 +346,8 @@ void processProvisioningConfig(StaticJsonDocument<512>& doc) {
 
     Serial.println(F("[SETUP] Autenticação com Secret Key bem-sucedida!"));
 
+    if (doc.containsKey("wifi_ssid")) wifiSSID = doc["wifi_ssid"].as<String>();
+    if (doc.containsKey("wifi_pass")) wifiPass = doc["wifi_pass"].as<String>();
     if (doc.containsKey("client_id")) clientId = doc["client_id"].as<String>();
     if (doc.containsKey("machine_id")) machineId = doc["machine_id"].as<String>();
 
@@ -311,7 +392,8 @@ void handleLedStateMachine() {
             digitalWrite(LED_STATUS_PIN, LOW);
             break;
         case LED_STATE_WIFI_CONNECTING:
-            if (now - lastLedBlinkTimer >= 500) {
+        case LED_STATE_AP_MODE:
+            if (now - lastLedBlinkTimer >= 300) {
                 lastLedBlinkTimer = now;
                 ledToggleState = !ledToggleState;
                 digitalWrite(LED_STATUS_PIN, ledToggleState ? HIGH : LOW);
@@ -377,10 +459,6 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
                 publishFullState();
             }
         }
-    } else if (topicStr.endsWith("/cmd/sequencia")) {
-        if (!error && doc.containsKey("box")) {
-            // Suporte para sequência
-        }
     } else if (topicStr.endsWith("/cmd/status_get")) {
         publishFullState();
     }
@@ -426,7 +504,7 @@ void setup() {
     Serial.begin(115200);
     delay(100);
     Serial.println(F("\n=============================================="));
-    Serial.println(F(" GallopIT Firmware v2.1 (Discovery + Setup) "));
+    Serial.println(F(" GallopIT Firmware v2.1 (WiFi AP + MQTT Setup)"));
     Serial.println(F("==============================================\n"));
 
     pinMode(LED_STATUS_PIN, OUTPUT);
@@ -449,6 +527,12 @@ void setup() {
 
 void loop() {
     handleLedStateMachine();
+
+    if (isAPMode) {
+        dnsServer.processNextRequest();
+        server.handleClient();
+        return;
+    }
 
     if (WiFi.status() == WL_CONNECTED) {
         if (!client.connected()) reconnectMQTT();

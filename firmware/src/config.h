@@ -11,6 +11,14 @@
 #define DEFAULT_CLIENT_ID  "cliente_demo"
 #define DEFAULT_MACHINE_ID "eq_demo_01"
 
+// Credenciais Wi-Fi Padrão / Fallback
+#define DEFAULT_WIFI_SSID  "MEO-5E3030"
+#define DEFAULT_WIFI_PASS  "123456789"
+
+// Nome do Ponto de Acesso (AP) para Setup Wi-Fi sem fios
+#define AP_SETUP_SSID_PREFIX "GallopIT-Setup-"
+#define AP_SETUP_PASS        "gallopit123"
+
 // --- Definições de Pinos do ESP32 ---
 const int RELAY_PINS[4] = {18, 19, 21, 22}; // Pinos das Boxes 1, 2, 3 e 4
 const int LED_STATUS_PIN = 2;               // LED de sinalização de estado do armário
@@ -18,19 +26,6 @@ const int LED_STATUS_PIN = 2;               // LED de sinalização de estado do
 // --- Temporizações de Segurança ---
 const unsigned long SOLENOID_PULSE_MS = 4000;   // 4 segundos exatos por abertura
 const unsigned long PRE_WARNING_MS = 5000;       // 5 segundos de aviso prévio (LED pisca rápido)
-
-// --- Configurações de Wi-Fi ---
-struct ConfigRede {
-    const char* ssid;
-    const char* password;
-};
-
-const ConfigRede REDES[] = {
-    {"MEO-5E3030", "123456789"},
-    {"iPhone do jota", "jota1234"},
-    {"Wokwi-GUEST", ""}
-};
-const int NUM_REDES = sizeof(REDES) / sizeof(REDES[0]);
 
 // --- Configurações de MQTT ---
 const char* DEFAULT_MQTT_SERVER = "test.mosquitto.org";
