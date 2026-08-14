@@ -1,7 +1,7 @@
 /**
  * GallopIT Firmware v2.1 - ESP32
  * Sistema de Cavalariça Inteligente IoT
- * PlatformIO Build - Compatible with ArduinoJson v7
+ * PlatformIO Build - Compatible with ArduinoJson v7 & Brownout Protection
  */
 
 #include <WiFi.h>
@@ -11,6 +11,8 @@
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include <time.h>
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
 #include "config.h"
 
 // --- Instância de Memória Permanente (NVS Flash) ---
@@ -98,6 +100,13 @@ void mqttCallback(char* topic, byte* payload, unsigned int length);
 
 void loadStoredPreferences() {
     preferences.begin("gallopit", false);
+
+    if (!preferences.isKey("wifi_ssid")) preferences.putString("wifi_ssid", DEFAULT_WIFI_SSID);
+    if (!preferences.isKey("wifi_pass")) preferences.putString("wifi_pass", DEFAULT_WIFI_PASS);
+    if (!preferences.isKey("client_id")) preferences.putString("client_id", DEFAULT_CLIENT_ID);
+    if (!preferences.isKey("machine_id")) preferences.putString("machine_id", DEFAULT_MACHINE_ID);
+    if (!preferences.isKey("modo")) preferences.putString("modo", "DELAY");
+
     wifiSSID = preferences.getString("wifi_ssid", DEFAULT_WIFI_SSID);
     wifiPass = preferences.getString("wifi_pass", DEFAULT_WIFI_PASS);
     clientId = preferences.getString("client_id", DEFAULT_CLIENT_ID);
@@ -147,6 +156,8 @@ bool connectToWiFi() {
     Serial.println(wifiSSID);
 
     WiFi.mode(WIFI_STA);
+    WiFi.setTxPower(WIFI_POWER_15dBm); // Reduz consumo elétrico da antena no arranque
+
     WiFi.begin(wifiSSID.c_str(), wifiPass.c_str());
 
     currentLedState = LED_STATE_WIFI_CONNECTING;
@@ -179,6 +190,7 @@ void startAPMode() {
 
     String apName = String(AP_SETUP_SSID_PREFIX) + macAddressClean;
     WiFi.mode(WIFI_AP);
+    WiFi.setTxPower(WIFI_POWER_15dBm);
     WiFi.softAP(apName.c_str(), AP_SETUP_PASS);
 
     IPAddress apIP(192, 168, 4, 1);
@@ -255,8 +267,8 @@ void publishDiscoveryAnnouncement() {
 
     String output;
     serializeJson(doc, output);
-    client.publish(topicDiscovery.c_str(), output.c_str());
-    Serial.println(F("[DISCOVERY] Anúncio enviado para gallopit/discovery/announcement!"));
+    client.publish(topicDiscovery.c_str(), output.c_str(), true);
+    Serial.println(F("[DISCOVERY] Anúncio enviado (RETAINED) para gallopit/discovery/announcement!"));
 }
 
 void reconnectMQTT() {
@@ -499,10 +511,12 @@ void processAgendaLogic() {
 }
 
 void setup() {
+    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+
     Serial.begin(115200);
     delay(100);
     Serial.println(F("\n=============================================="));
-    Serial.println(F(" GallopIT Firmware v2.1 (PlatformIO Build)   "));
+    Serial.println(F(" GallopIT Firmware v2.1 (Brownout Protected) "));
     Serial.println(F("==============================================\n"));
 
     pinMode(LED_STATUS_PIN, OUTPUT);

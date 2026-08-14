@@ -5,7 +5,7 @@
 
 // --- Identificadores de Setup e Segurança (GallopIT v2.1) ---
 #define SYSTEM_PREFIX       "gallopit"
-#define PROVISIONING_SECRET "GALLOPIT_SECURE_AUTH_KEY_2026" // Chave secreta obrigatória para o setup inicial seguro
+#define PROVISIONING_SECRET "GALLOPIT_SECURE_AUTH_KEY_2026" // Chave secreta para setup inicial seguro
 
 // Valores por omissão (antes do provisionamento)
 #define DEFAULT_CLIENT_ID  "cliente_demo"
@@ -27,8 +27,8 @@ const int LED_STATUS_PIN = 2;               // LED de sinalização de estado do
 const unsigned long SOLENOID_PULSE_MS = 4000;   // 4 segundos exatos por abertura
 const unsigned long PRE_WARNING_MS = 5000;       // 5 segundos de aviso prévio (LED pisca rápido)
 
-// --- Configurações de MQTT ---
-const char* DEFAULT_MQTT_SERVER = "test.mosquitto.org";
+// --- Configurações de MQTT (Usando EMQX Public Broker de alta disponibilidade) ---
+const char* DEFAULT_MQTT_SERVER = "broker.emqx.io";
 const int DEFAULT_MQTT_PORT = 1883;
 
 // --- Servidor NTP para Agendamento Autónomo ---

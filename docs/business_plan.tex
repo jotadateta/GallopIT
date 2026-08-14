@@ -1,0 +1,267 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{utf8}
+\usepackage[portuguese]{babel}
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,tabularx,multirow}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{tcolorbox}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{array}
+
+% Configuration of Colors
+\definecolor{primary}{RGB}{18, 52, 86}      % Navy Blue
+\definecolor{secondary}{RGB}{34, 139, 34}   % Forest Green / Accent
+\definecolor{darkgray}{RGB}{50, 50, 50}
+\definecolor{lightbg}{RGB}{245, 247, 250}
+\definecolor{boxborder}{RGB}{200, 210, 225}
+
+% Hyperref Setup
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primary,
+    urlcolor=secondary,
+    pdftitle={EquiLock - Master Business Plan \& Investor Dossier},
+    pdfauthor={GallopIT Team}
+}
+
+% Section Styling
+\titleformat{\section}{\color{primary}\Large\bfseries}{\thesection}{1em}{}[\hrule height 1pt]
+\titleformat{\subsection}{\color{secondary}\large\bfseries}{\thesubsection}{1em}{}
+
+% Custom TColorBox for Key Highlights
+\newtcolorbox{highlightbox}[1][]{
+    colback=lightbg,
+    colframe=primary,
+    fonttitle=\bfseries,
+    coltitle=white,
+    boxrule=1pt,
+    arc=4pt,
+    #1
+}
+
+\newtcolorbox{metricbox}[1][]{
+    colback=lightbg,
+    colframe=secondary,
+    fonttitle=\bfseries,
+    coltitle=white,
+    boxrule=1.2pt,
+    arc=4pt,
+    #1
+}
+
+\begin{document}
+
+% -----------------------------------------------------------------------------
+% TITLE PAGE / HEADER
+% -----------------------------------------------------------------------------
+\begin{center}
+    {\Huge \bfseries \color{primary} EquiLock (GallopIT)}\\[0.3cm]
+    {\Large \bfseries Master Business Plan \& Dossiê de Investimento}\\[0.2cm]
+    {\color{darkgray} Plataforma IoT + SaaS de Gestão Autónoma e Segura de Baias em Cavalariças}\\[0.4cm]
+    \textbf{Versão 2.0} --- \today \\
+    \rule{\textwidth}{1.5pt}
+\end{center}
+
+\vspace{0.3cm}
+
+% -----------------------------------------------------------------------------
+% 1. EXECUTIVE SNAPSHOT
+% -----------------------------------------------------------------------------
+\section{Executive Snapshot \& Ficha do Projeto}
+
+\begin{table}[h!]
+\centering
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\rowcolor{primary!10} \textbf{Parâmetro} & \textbf{Especificação / Valor Estratégico} \\ \hline
+\textbf{Nome do Produto} & \textbf{EquiLock} (Desenvolvido no âmbito do projeto GallopIT) \\ \hline
+\textbf{Mercado Alvo} & EquineTech / Smart Stables (Automação IoT para Cavalariças e Haras) \\ \hline
+\textbf{Modelo de Negócio} & Híbrido: Venda de Hardware B2B (Módulo de 4 Baias) + Assinatura SaaS Recorrente (MRR) \\ \hline
+\textbf{Custo de Fabrico (BOM V2)} & \textbf{87,00 €} por Unidade de 4 Baias (Produção em Escala) \\ \hline
+\textbf{Preço de Venda Hardware} & \textbf{399,00 €} por Unidade de 4 Baias (\textbf{Margem Bruta de Hardware: 78,2\%}) \\ \hline
+\textbf{Assinatura SaaS Recorrente} & \textbf{4,99 €} / Baia / Mês (\textbf{Margem Bruta de Software: 92,0\%}) \\ \hline
+\textbf{Rácio LTV / CAC} & \textbf{5,4x} (LTV: 1.197,60 € $|$ CAC Estimado: 220,00 € por cliente médio de 20 baias) \\ \hline
+\textbf{Payback do Cliente Final} & \textbf{5,8 Meses} (Retorno do Investimento para a Cavalariça em poupança de mão-de-obra) \\ \hline
+\textbf{Necessidade de Capital (Ask)} & \textbf{75.000 €} por 15\% de Equity (Valuação Pre-Money: 500.000 €) \\ \hline
+\end{tabularx}
+\end{table}
+
+% -----------------------------------------------------------------------------
+% 2. RESUMO EXECUTIVO
+% -----------------------------------------------------------------------------
+\section{Resumo Executivo (Elevator Pitch)}
+
+\begin{highlightbox}[title=A Oportunidade EquiLock]
+O \textbf{EquiLock} é uma solução pioneira no sector equestre que automatiza a abertura e alimentação agendada em cavalariças. Combina um invólucro de hardware inteligente instalado \textbf{exclusivamente no exterior das baias} com uma plataforma cloud em tempo real, eliminando custos excessivos de mão-de-obra e promovendo o bem-estar animal.
+\end{highlightbox}
+
+\subsection{O Problema de Mercado}
+\begin{itemize}[leftmargin=*]
+    \textbf{\item Custos Operacionais Elevados:} A alimentação e soltura matinal dos cavalos exige a presença física de tratadores em horários madrugadores (06:00h--07:00h), representando até 40\% dos custos operacionais de uma cavalariça.
+    \textbf{\item Stresse e Saúde Animal:} Atrasos na rotina de alimentação causam ansiedade, stresse comportamental e graves problemas digestivos (ex: cólicas e úlceras gástricas).
+    \textbf{\item Ausência de Auditoria:} Donos de cavalos de elevado valor não possuem forma de verificar remotamente se o seu animal foi alimentado ou solto no horário correto.
+\end{itemize}
+
+\subsection{A Solução EquiLock}
+O EquiLock resolve estes desafios através de uma abordagem dupla:
+\begin{enumerate}
+    \item \textbf{Módulo de Hardware Exterior Multi-Box:} Um único microcontrolador de baixo custo (ESP32) controla até 4 trincos/atuadores de 12V. O pulso de atuação é rigidamente limitado a \textbf{4 segundos} por firmware para evitar aquecimento, contando com mecanismo de \textbf{abertura manual de emergência}.
+    \item \textbf{Plataforma SaaS Multi-Tenant (RBAC):} Painel de controlo web intuitivo com diferenciação de perfis (\texttt{DEVELOPER}, \texttt{CLIENT\_ADMIN} e \texttt{OPERATOR}) e 4 modos de operação (Manual, Sequência Diária com pré-aviso por LED, Agendamento NTP e Fallback Offline).
+\end{enumerate}
+
+% -----------------------------------------------------------------------------
+% 3. MÉTRICAS CHAVE PARA INVESTIDORES
+% -----------------------------------------------------------------------------
+\section{Métricas Chave para Investidores (The Investor Dashboard)}
+
+Investidores de capital de risco procuram eficiência unitária (\emph{Unit Economics}), margens brutas elevadas e previsibilidade de receita recorrente. 
+
+\begin{metricbox}[title=Dashboard de Unit Economics (Cavalariça Média de 20 Baias)]
+\small
+\begin{tabularx}{\textwidth}{X c c}
+\textbf{Métrica Financeira / Operacional} & \textbf{Valor EquiLock} & \textbf{Benchmark Indústria B2B SaaS/IoT} \\
+\hline
+Margem Bruta de Hardware & \textbf{78,2 \%} & 35\% -- 50\% (EquiLock Supera) \\
+Margem Bruta de Software (SaaS) & \textbf{92,0 \%} & 80\% -- 85\% \\
+ARPU (Receita Média Mensal por Baia) & \textbf{4,99 € / baia} & Pioneiro no segmento \\
+MRR por Cliente Médio (20 baias) & \textbf{99,80 € / mês} & 50€ -- 150€ \\
+ARR por Cliente Médio (20 baias) & \textbf{1.197,60 € / ano} & 600€ -- 1.800€ \\
+LTV (Lifetime Value a 3 Anos) & \textbf{3.592,80 €} & > 3x CAC \\
+CAC (Custo de Aquisição de Cliente) & \textbf{220,00 €} & < LTV / 3 \\
+\textbf{Rácio LTV / CAC} & \textbf{5,4x} & \textbf{Meta: > 3,0x (Excelente)} \\
+Payback do CAC & \textbf{2,2 Meses} & < 12 Meses \\
+Churn Rate Mensal Estimado & \textbf{< 1,0 \%} & < 2,0\% (Infraestrutura B2B) \\
+\textbf{Payback do Cliente Final (Cavalariça)} & \textbf{5,8 Meses} & < 12 Meses \\
+\hline
+\end{tabularx}
+\end{metricbox}
+
+% -----------------------------------------------------------------------------
+% 4. ANÁLISE DE MERCADO & CONCORRÊNCIA
+% -----------------------------------------------------------------------------
+\section{Análise de Mercado \& Estudo Comparativo}
+
+\subsection{Dimensão do Mercado (TAM / SAM / SOM)}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{TAM (Total Addressable Market):} 60 Milhões de Cavalos no Mundo ($\approx$ 1,5M Cavalariças) $\rightarrow$ \textbf{\$ 7,2 Mil Milhões / ano}.
+    \item \textbf{SAM (Serviceable Addressable Market):} 150.000 Centros Hípicos Profissionais na Europa e EUA $\rightarrow$ \textbf{\$ 900 Milhões / ano}.
+    \item \textbf{SOM (Serviceable Obtainable Market - Meta Ano 3):} 500 Cavalariças na Europa do Sul (10.000 Baias) $\rightarrow$ \textbf{\$ 2,6 Milhões / ano}.
+\end{itemize}
+
+\subsection{Matriz de Benchmarking da Concorrência}
+
+\begin{table}[h!]
+\centering
+\scriptsize
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|X|c|c|c|c|c|}
+\hline
+\rowcolor{primary!10} \textbf{Funcionalidade / Critério} & \textbf{EquiLock} & \textbf{Haygain Grazer} & \textbf{iFEED} & \textbf{Feed-X} & \textbf{Shelly DIY} \\ \hline
+\textbf{Custo Estimado por Baia (€)} & \textbf{~85€ -- 100€} & ~1.200€ & ~550€ & ~150€ & ~80€ \\ \hline
+\textbf{Instalação 100\% Exterior} & \textbf{SIM} & NÃO (Interior) & NÃO (Grelha) & SIM (Portão) & Varia \\ \hline
+\textbf{Override Manual de Emergência} & \textbf{SIM} & NÃO & NÃO & SIM & Dependente \\ \hline
+\textbf{Pulso Seguro 4s (Sem Aquecer)} & \textbf{SIM} & NÃO & NÃO & NÃO & NÃO \\ \hline
+\textbf{SaaS Multi-Tenant (RBAC)} & \textbf{SIM} & NÃO & NÃO & NÃO & NÃO \\ \hline
+\textbf{Auditoria \& Logs Cloud} & \textbf{SIM} & NÃO & NÃO & NÃO & NÃO \\ \hline
+\textbf{Resiliência Offline (NTP/EEPROM)} & \textbf{SIM} & SIM (Local) & SIM (Timer) & SIM (Mecânico) & NÃO \\ \hline
+\end{tabularx}
+\caption{Comparativo direto do EquiLock face às alternativas de mercado.}
+\end{table}
+
+% -----------------------------------------------------------------------------
+% 5. ARQUITETURA TÉCNICA E ENGENHARIA
+% -----------------------------------------------------------------------------
+\section{Arquitetura Técnica Integrada}
+
+\subsection{Hardware IoT (Regras de Segurança Físicas)}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Atuação Temporizada de 4 Segundos:} O solenoide de 12V recebe energia unicamente durante 4 segundos exatos, prevenindo o sobreaquecimento e falha de bobina.
+    \item \textbf{Resiliência Autónoma Offline:} Se o sinal Wi-Fi falhar, o microcontrolador ESP32 utiliza o seu relógio interno (NTP com software RTC) e EEPROM para manter o cumprimento rigoroso dos agendamentos.
+    \item \textbf{LED de Diagnóstico:} Piscar lento (Procura Wi-Fi), Fixo por 3s (Conectado), Piscar rápido por 5s (Aviso prévio de abertura) e Fixo por 4s (Abertura em curso).
+\end{itemize}
+
+\subsection{Software SaaS \& Plataforma Cloud (RBAC)}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{DEVELOPER (Super Admin):} Registo de novos armários/máquinas por UUID/MAC e atribuição a clientes.
+    \item \textbf{CLIENT\_ADMIN (Dono do Haras):} Gestão da equipa, associação de tratadores a baias específicas e parametrização de horários.
+    \item \textbf{OPERATOR (Tratador):} Acesso simplificado a botões manuais e início de sequência diária.
+\end{itemize}
+
+% -----------------------------------------------------------------------------
+% 6. PROJEÇÕES FINANCEIRAS & P&L
+% -----------------------------------------------------------------------------
+\section{Projeções Financeiras a 3 Anos (Demonstração de Resultados)}
+
+\begin{table}[h!]
+\centering
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{X r r r}
+\hline
+\rowcolor{primary!10} \textbf{Rubrica Financeira (€)} & \textbf{Ano 1} & \textbf{Ano 2} & \textbf{Ano 3} \\ \hline
+Unidades de Hardware Vendidas (4 Baias/un) & 50 Unidades & 250 Unidades & 800 Unidades \\
+Total de Baias Automatizadas & 200 Baias & 1.000 Baias & 3.200 Baias \\ \hline
+Receita de Venda de Hardware (399€/un) & 19.950 € & 99.750 € & 319.200 € \\
+Receita Recorrente SaaS (4,99€/baia/mês) & 4.800 € & 28.800 € & 115.200 € \\ \hline
+\textbf{RECEITA TOTAL BRUTA} & \textbf{24.750 €} & \textbf{128.550 €} & \textbf{434.400 €} \\ \hline
+Custo dos Produtos Vendidos (COGS HW @ 87€) & (4.350 €) & (21.750 €) & (69.600 €) \\
+Infraestrutura Cloud \& AWS & (400 €) & (2.300 €) & (9.200 €) \\ \hline
+\textbf{MARGEM BRUTA TOTAL} & \textbf{20.000 € (80,8\%)} & \textbf{104.500 € (81,3\%)} & \textbf{355.600 € (81,9\%)} \\ \hline
+Despesas Operacionais (R\&D, Salários) & (9.000 €) & (35.000 €) & (90.000 €) \\
+Vendas, Marketing \& Feiras Equestres & (3.000 €) & (12.000 €) & (25.000 €) \\ \hline
+\textbf{EBITDA (LUCRO OPERACIONAL)} & \textbf{+8.000 €} & \textbf{+57.500 €} & \textbf{+240.600 €} \\
+\textbf{Margem EBITDA (\%)} & \textbf{32,3 \%} & \textbf{44,7 \%} & \textbf{55,4 \%} \\ \hline
+\end{tabularx}
+\caption{Projeções financeiras consolidadas a 3 anos.}
+\end{table}
+
+% -----------------------------------------------------------------------------
+% 7. RETORNO DO INVESTIMENTO PARA O CLIENTE FINAL (ROI CALCULATOR)
+% -----------------------------------------------------------------------------
+\section{Calculadora de ROI para a Cavalariça (Argumento de Venda)}
+
+Considerando um Centro Hípico com \textbf{20 Baias} (5 unidades EquiLock):
+\begin{enumerate}
+    \item \textbf{Investimento em Hardware:} 5 Unidades $\times$ 399,00 € = \textbf{1.995,00 €}
+    \item \textbf{Subscrição SaaS Anual:} 20 Baias $\times$ 4,99 € $\times$ 12 meses = \textbf{1.197,60 € / ano}
+    \item \textbf{Custo Total no Ano 1:} \textbf{3.192,60 €}
+\end{enumerate}
+
+\subsection{Poupança em Mão-de-Obra}
+\begin{align*}
+\text{Poupança Diária} &= 1.5\text{ horas/dia} \times 12,00\text{ €/hora} = 18,00\text{ € / dia} \\
+\text{Poupança Anual Bruta} &= 18,00\text{ €/dia} \times 365\text{ dias} = \mathbf{6.570,00\text{ € / ano}} \\
+\text{Lucro Líquido do Cliente no Ano 1} &= 6.570,00\text{ €} - 3.192,60\text{ €} = \mathbf{+3.377,40\text{ €}}
+\end{align*}
+
+\[
+\text{Payback do Investimento para a Cavalariça} = \frac{3.192,60\text{ €}}{547,50\text{ € / mês}} = \mathbf{5,8\text{ Meses}}
+\]
+
+% -----------------------------------------------------------------------------
+% 8. INVESTMENT ASK & USE OF FUNDS
+% -----------------------------------------------------------------------------
+\section{Proposta de Investimento (Investment Ask)}
+
+Procuramos um investimento anjo / \emph{seed} de \textbf{75.000 €} em troca de \textbf{15\% de Equity} (Valuação Pre-Money: 500.000 €).
+
+\begin{highlightbox}[title=Alocação dos Fundos (75.000 €)]
+\begin{itemize}[leftmargin=*]
+    \item \textbf{35\% (26.250 €) --- Industrialização V2:} Criação de moldes estanque IP65, desenvolvimento de PCB dedicada e certificação CE.
+    \item \textbf{30\% (22.500 €) --- Vendas \& Marketing:} Stand interativo em Feiras Equestres Nacionais e Internacionais (ex: Feira da Golegã, CSI).
+    \item \textbf{25\% (18.750 €) --- Software SaaS:} Expansão da infraestrutura cloud e desenvolvimento de aplicações móveis nativas (iOS/Android).
+    \item \textbf{10\% (7.500 €) --- Fundo de Maneio:} Contingência e capital de reserva.
+\end{itemize}
+\end{highlightbox}
+
+\vspace{0.5cm}
+\begin{center}
+    {\small \color{darkgray} Documento gerado automaticamente para compilação em Overleaf / LaTeX --- Project GallopIT \copyright\ \today}
+\end{center}
+
+\end{document}
