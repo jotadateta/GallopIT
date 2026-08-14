@@ -1,7 +1,7 @@
 /**
- * GallopIT Firmware v2.1 - ESP32
+ * GallopIT Firmware v2.2 - ESP32
  * Sistema de Cavalariça Inteligente IoT
- * Suporte para Estado Lógico Latch (ARMADA vs ABERTA) com NVS, Ping/Pong e MQTT Multi-Tenant
+ * Suporte para Buffer Estendido PubSubClient (1024 Bytes), Estado Lógico Latch & Ping Mode
  */
 
 #include <WiFi.h>
@@ -281,12 +281,13 @@ void publishDiscoveryAnnouncement() {
     doc["mac_clean"] = macAddressClean;
     doc["setup_topic"] = topicSetupConfig;
     doc["provisioned"] = isProvisioned;
-    doc["firmware"] = "2.1.0-ESP32";
+    doc["firmware"] = "2.2.0-ESP32";
 
     String output;
     serializeJson(doc, output);
-    client.publish(topicDiscovery.c_str(), output.c_str(), true);
-    Serial.println(F("[DISCOVERY] Anúncio enviado (RETAINED) para gallopit/discovery/announcement!"));
+    bool ok = client.publish(topicDiscovery.c_str(), output.c_str(), true);
+    Serial.print(F("[DISCOVERY] Anúncio enviado (RETAINED): "));
+    Serial.println(ok ? F("SUCESSO") : F("FALHA"));
 }
 
 void reconnectMQTT() {
@@ -329,7 +330,7 @@ void publishFullState() {
     doc["modo_ativo"] = modoAtivo;
     doc["intervalo_minutos"] = intervaloDelayMinutos;
     doc["sequencia_em_execucao"] = sequenciaEmExecucao;
-    doc["firmware"] = "2.1.0-ESP32";
+    doc["firmware"] = "2.2.0-ESP32";
     doc["wifi_rssi"] = WiFi.RSSI();
 
     JsonArray boxesArr = doc["boxes"].to<JsonArray>();
@@ -345,7 +346,13 @@ void publishFullState() {
 
     String output;
     serializeJson(doc, output);
-    client.publish(topicStatusState.c_str(), output.c_str(), true);
+
+    bool ok = client.publish(topicStatusState.c_str(), output.c_str(), true);
+    
+    Serial.print(F("[MQTT STATE] Estado publicado em ["));
+    Serial.print(topicStatusState);
+    Serial.print(F("] (Tamanho: ")); Serial.print(output.length()); Serial.print(F(" B): "));
+    Serial.println(ok ? F("SUCESSO") : F("ERRO_PUBLISH"));
 }
 
 void publishEvent(String evento, int boxNum, String origem, String msg) {
@@ -562,7 +569,7 @@ void setup() {
     Serial.begin(115200);
     delay(100);
     Serial.println(F("\n=============================================="));
-    Serial.println(F(" GallopIT Firmware v2.2 (Latch & Ping Mode)   "));
+    Serial.println(F(" GallopIT Firmware v2.2 (Buffer 1024B Fix)   "));
     Serial.println(F("==============================================\n"));
 
     pinMode(LED_STATUS_PIN, OUTPUT);
@@ -579,6 +586,7 @@ void setup() {
     if (connectToWiFi()) {
         client.setServer(DEFAULT_MQTT_SERVER, DEFAULT_MQTT_PORT);
         client.setCallback(mqttCallback);
+        client.setBufferSize(1024);
         reconnectMQTT();
     }
 }
