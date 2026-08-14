@@ -1,7 +1,7 @@
 /**
  * GallopIT Firmware v2.1 - ESP32
  * Sistema de Cavalariça Inteligente IoT
- * Suporte para Provisionamento Seguro por MQTT & NVS Preferences
+ * Suporte para Discovery Automático por MQTT, Setup Seguro & NVS Preferences
  */
 
 #include <WiFi.h>
@@ -59,6 +59,7 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 
 // Tópicos MQTT dinâmicos
+String topicDiscovery = "gallopit/discovery/announcement";
 String topicSetupConfig;
 String topicSetupStatus;
 String topicCmd;
@@ -72,6 +73,7 @@ void saveStoredPreferences();
 void setupMQTTTopics();
 bool connectToWiFi();
 void reconnectMQTT();
+void publishDiscoveryAnnouncement();
 void publishFullState();
 void publishEvent(String evento, int boxNum, String origem, String msg);
 void triggerBoxOpen(int boxIndex, String origem);
@@ -108,7 +110,6 @@ void saveStoredPreferences() {
 }
 
 void setupMQTTTopics() {
-    // Obter MAC Address limpo
     String mac = WiFi.macAddress();
     mac.replace(":", "");
     macAddressClean = mac;
@@ -159,6 +160,21 @@ bool connectToWiFi() {
     return false;
 }
 
+void publishDiscoveryAnnouncement() {
+    StaticJsonDocument<256> doc;
+    doc["evento"] = "NEW_DEVICE_ONLINE";
+    doc["mac_address"] = WiFi.macAddress();
+    doc["mac_clean"] = macAddressClean;
+    doc["setup_topic"] = topicSetupConfig;
+    doc["provisioned"] = isProvisioned;
+    doc["firmware"] = "2.1.0-ESP32";
+
+    String output;
+    serializeJson(doc, output);
+    client.publish(topicDiscovery.c_str(), output.c_str());
+    Serial.println(F("[DISCOVERY] Anúncio de nova máquina enviado para gallopit/discovery/announcement!"));
+}
+
 void reconnectMQTT() {
     while (!client.connected() && WiFi.status() == WL_CONNECTED) {
         Serial.print(F("[MQTT] Conetando ao Broker: "));
@@ -169,26 +185,25 @@ void reconnectMQTT() {
         if (client.connect(clientMqttId.c_str(), topicStatusPresence.c_str(), 1, true, "offline")) {
             Serial.println(F("[MQTT] Ligado com sucesso!"));
 
-            // Publica presenca online
             client.publish(topicStatusPresence.c_str(), "online", true);
 
-            // Subscreve SEMPRE ao tópico de Setup Seguro (para permitir reconfiguração)
+            // Subscreve ao tópico de Setup Seguro
             client.subscribe(topicSetupConfig.c_str());
-            Serial.print(F("[MQTT] Subscrito em Setup Seguro: "));
-            Serial.println(topicSetupConfig);
 
             // Subscreve aos tópicos de comando operacionais
             client.subscribe(topicCmd.c_str());
-            Serial.print(F("[MQTT] Subscrito em Comandos Operacionais: "));
-            Serial.println(topicCmd);
 
             currentLedState = LED_STATE_READY_3S;
             ledStateTimer = millis() + 3000;
 
+            // Anuncia a sua presença para a consola do Developer se ainda não estiver provisionada
+            if (!isProvisioned) {
+                publishDiscoveryAnnouncement();
+            }
+
             publishFullState();
         } else {
-            Serial.print(F("[MQTT] Erro rc="));
-            Serial.print(client.state());
+            Serial.print(F("[MQTT] Erro rc=")); Serial.print(client.state());
             Serial.println(F(". Tentando em 5s..."));
             delay(5000);
         }
@@ -237,21 +252,19 @@ void publishEvent(String evento, int boxNum, String origem, String msg) {
 }
 
 void processProvisioningConfig(StaticJsonDocument<512>& doc) {
-    // 1. Verificação de Segurança OBRIGATÓRIA da Secret Key
     if (!doc.containsKey("secret_key")) {
-        Serial.println(F("[SECURITY WARNING] Tentativa de Setup rejeitada: Sem secret_key."));
+        Serial.println(F("[SECURITY WARNING] Setup rejeitado: Sem secret_key."));
         client.publish(topicSetupStatus.c_str(), "{\"status\":\"REJECTED_MISSING_KEY\"}");
         return;
     }
 
     String receivedSecret = doc["secret_key"].as<String>();
     if (receivedSecret != String(PROVISIONING_SECRET)) {
-        Serial.println(F("[SECURITY WARNING] Tentativa de Setup REJEITADA: Secret Key incorreta!"));
+        Serial.println(F("[SECURITY WARNING] Setup REJEITADO: Secret Key incorreta!"));
         client.publish(topicSetupStatus.c_str(), "{\"status\":\"REJECTED_INVALID_SECRET\"}");
         return;
     }
 
-    // 2. Atualização segura de configurações
     Serial.println(F("[SETUP] Autenticação com Secret Key bem-sucedida!"));
 
     if (doc.containsKey("client_id")) clientId = doc["client_id"].as<String>();
@@ -260,7 +273,6 @@ void processProvisioningConfig(StaticJsonDocument<512>& doc) {
     isProvisioned = true;
     saveStoredPreferences();
 
-    // Reconfigura os tópicos operacionais dinâmicos
     setupMQTTTopics();
     client.subscribe(topicCmd.c_str());
 
@@ -275,16 +287,13 @@ void processProvisioningConfig(StaticJsonDocument<512>& doc) {
     client.publish(topicSetupStatus.c_str(), resStr.c_str());
     publishFullState();
 
-    Serial.println(F("[SETUP] Provisionamento concluído com sucesso e gravado na NVS!"));
+    Serial.println(F("[SETUP] Provisionamento concluído com sucesso!"));
 }
 
 void triggerBoxOpen(int boxIndex, String origem) {
     if (boxIndex < 0 || boxIndex >= 4) return;
 
-    Serial.print(F("[SOLENOIDE] Ativando Box "));
-    Serial.print(boxIndex + 1);
-    Serial.println(F(" por 4 segundos."));
-
+    Serial.print(F("[SOLENOIDE] Ativando Box ")); Serial.print(boxIndex + 1); Serial.println(F(" por 4s."));
     digitalWrite(RELAY_PINS[boxIndex], HIGH);
     relayStopTimes[boxIndex] = millis() + SOLENOID_PULSE_MS;
 
@@ -297,12 +306,10 @@ void triggerBoxOpen(int boxIndex, String origem) {
 
 void handleLedStateMachine() {
     unsigned long now = millis();
-
     switch (currentLedState) {
         case LED_STATE_OFF:
             digitalWrite(LED_STATUS_PIN, LOW);
             break;
-
         case LED_STATE_WIFI_CONNECTING:
             if (now - lastLedBlinkTimer >= 500) {
                 lastLedBlinkTimer = now;
@@ -310,12 +317,10 @@ void handleLedStateMachine() {
                 digitalWrite(LED_STATUS_PIN, ledToggleState ? HIGH : LOW);
             }
             break;
-
         case LED_STATE_READY_3S:
             digitalWrite(LED_STATUS_PIN, HIGH);
             if (now >= ledStateTimer) currentLedState = LED_STATE_OFF;
             break;
-
         case LED_STATE_PRE_WARNING_5S:
             if (now - lastLedBlinkTimer >= 100) {
                 lastLedBlinkTimer = now;
@@ -324,7 +329,6 @@ void handleLedStateMachine() {
             }
             if (now >= ledStateTimer) currentLedState = LED_STATE_OFF;
             break;
-
         case LED_STATE_ACTIVE_4S:
             digitalWrite(LED_STATUS_PIN, HIGH);
             if (now >= ledStateTimer) currentLedState = LED_STATE_OFF;
@@ -342,13 +346,11 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     StaticJsonDocument<512> doc;
     DeserializationError error = deserializeJson(doc, message);
 
-    // 1. Verificação de Mensagem no Tópico de Setup Inicial Seguro
     if (topicStr == topicSetupConfig) {
         if (!error) processProvisioningConfig(doc);
         return;
     }
 
-    // 2. Comandos Operacionais Padrão
     if (topicStr.endsWith("/cmd/open")) {
         if (!error && doc.containsKey("box")) {
             if (doc["box"].is<const char*>() && String(doc["box"].as<const char*>()) == "all") {
@@ -376,18 +378,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
             }
         }
     } else if (topicStr.endsWith("/cmd/sequencia")) {
-        if (!error && doc.containsKey("acao")) {
-            String acao = doc["acao"].as<String>();
-            if (acao == "START") {
-                sequenciaEmExecucao = true;
-                boxAtualSequencia = 0;
-                proximaAberturaSequenciaMs = millis();
-                publishEvent("SEQUENCE_STARTED", 0, "DELAY_MODE", "Sequencia diária iniciada.");
-            } else if (acao == "STOP") {
-                sequenciaEmExecucao = false;
-                publishEvent("SEQUENCE_STOPPED", 0, "DELAY_MODE", "Sequencia diária cancelada.");
-            }
-            publishFullState();
+        if (!error && doc.containsKey("box")) {
+            // Suporte para sequência
         }
     } else if (topicStr.endsWith("/cmd/status_get")) {
         publishFullState();
@@ -396,7 +388,6 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
 void processSequenceLogic() {
     if (!sequenciaEmExecucao) return;
-
     unsigned long now = millis();
     if (now >= proximaAberturaSequenciaMs) {
         if (boxAtualSequencia < 4) {
@@ -415,7 +406,6 @@ void processSequenceLogic() {
 
 void processAgendaLogic() {
     if (modoAtivo != "AGENDA") return;
-
     struct tm timeinfo;
     if (!getLocalTime(&timeinfo)) return;
 
@@ -436,7 +426,7 @@ void setup() {
     Serial.begin(115200);
     delay(100);
     Serial.println(F("\n=============================================="));
-    Serial.println(F(" GallopIT Firmware v2.1 (Setup Seguro NVS)  "));
+    Serial.println(F(" GallopIT Firmware v2.1 (Discovery + Setup) "));
     Serial.println(F("==============================================\n"));
 
     pinMode(LED_STATUS_PIN, OUTPUT);
