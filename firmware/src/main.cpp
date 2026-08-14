@@ -1,7 +1,7 @@
 /**
  * GallopIT Firmware v2.1 - ESP32
  * Sistema de Cavalariça Inteligente IoT
- * Suporte para Setup de Wi-Fi (AP WebServer + Captive Portal), MQTT Setup Seguro & NVS
+ * PlatformIO Build - Compatible with ArduinoJson v7
  */
 
 #include <WiFi.h>
@@ -93,7 +93,7 @@ void triggerBoxOpen(int boxIndex, String origem);
 void handleLedStateMachine();
 void processSequenceLogic();
 void processAgendaLogic();
-void processProvisioningConfig(StaticJsonDocument<512>& doc);
+void processProvisioningConfig(JsonDocument& doc);
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 
 void loadStoredPreferences() {
@@ -120,7 +120,7 @@ void saveStoredPreferences() {
     preferences.putString("wifi_pass", wifiPass);
     preferences.putString("client_id", clientId);
     preferences.putString("machine_id", machineId);
-    preferences.setBool("provisioned", isProvisioned);
+    preferences.putBool("provisioned", isProvisioned);
     preferences.putString("modo", modoAtivo);
     preferences.putInt("delay_min", intervaloDelayMinutos);
     preferences.end();
@@ -245,7 +245,7 @@ void handleAPSave() {
 }
 
 void publishDiscoveryAnnouncement() {
-    StaticJsonDocument<256> doc;
+    JsonDocument doc;
     doc["evento"] = "NEW_DEVICE_ONLINE";
     doc["mac_address"] = WiFi.macAddress();
     doc["mac_clean"] = macAddressClean;
@@ -290,7 +290,7 @@ void reconnectMQTT() {
 }
 
 void publishFullState() {
-    StaticJsonDocument<512> doc;
+    JsonDocument doc;
     doc["system"] = SYSTEM_PREFIX;
     doc["client_id"] = clientId;
     doc["machine_id"] = machineId;
@@ -302,9 +302,9 @@ void publishFullState() {
     doc["firmware"] = "2.1.0-ESP32";
     doc["wifi_rssi"] = WiFi.RSSI();
 
-    JsonArray boxesArr = doc.createNestedArray("boxes");
+    JsonArray boxesArr = doc["boxes"].to<JsonArray>();
     for (int i = 0; i < 4; i++) {
-        JsonObject b = boxesArr.createNestedObject();
+        JsonObject b = boxesArr.add<JsonObject>();
         b["box"] = i + 1;
         b["hora"] = boxAgenda[i].hora;
         b["minuto"] = boxAgenda[i].minuto;
@@ -318,7 +318,7 @@ void publishFullState() {
 }
 
 void publishEvent(String evento, int boxNum, String origem, String msg) {
-    StaticJsonDocument<256> doc;
+    JsonDocument doc;
     doc["evento"] = evento;
     doc["box"] = boxNum;
     doc["origem"] = origem;
@@ -330,8 +330,8 @@ void publishEvent(String evento, int boxNum, String origem, String msg) {
     client.publish(topicStatusEvent.c_str(), output.c_str());
 }
 
-void processProvisioningConfig(StaticJsonDocument<512>& doc) {
-    if (!doc.containsKey("secret_key")) {
+void processProvisioningConfig(JsonDocument& doc) {
+    if (!doc["secret_key"].is<const char*>() && !doc["secret_key"].is<String>()) {
         Serial.println(F("[SECURITY WARNING] Setup rejeitado: Sem secret_key."));
         client.publish(topicSetupStatus.c_str(), "{\"status\":\"REJECTED_MISSING_KEY\"}");
         return;
@@ -346,10 +346,10 @@ void processProvisioningConfig(StaticJsonDocument<512>& doc) {
 
     Serial.println(F("[SETUP] Autenticação com Secret Key bem-sucedida!"));
 
-    if (doc.containsKey("wifi_ssid")) wifiSSID = doc["wifi_ssid"].as<String>();
-    if (doc.containsKey("wifi_pass")) wifiPass = doc["wifi_pass"].as<String>();
-    if (doc.containsKey("client_id")) clientId = doc["client_id"].as<String>();
-    if (doc.containsKey("machine_id")) machineId = doc["machine_id"].as<String>();
+    if (doc["wifi_ssid"].is<const char*>() || doc["wifi_ssid"].is<String>()) wifiSSID = doc["wifi_ssid"].as<String>();
+    if (doc["wifi_pass"].is<const char*>() || doc["wifi_pass"].is<String>()) wifiPass = doc["wifi_pass"].as<String>();
+    if (doc["client_id"].is<const char*>() || doc["client_id"].is<String>()) clientId = doc["client_id"].as<String>();
+    if (doc["machine_id"].is<const char*>() || doc["machine_id"].is<String>()) machineId = doc["machine_id"].as<String>();
 
     isProvisioned = true;
     saveStoredPreferences();
@@ -357,7 +357,7 @@ void processProvisioningConfig(StaticJsonDocument<512>& doc) {
     setupMQTTTopics();
     client.subscribe(topicCmd.c_str());
 
-    StaticJsonDocument<256> resDoc;
+    JsonDocument resDoc;
     resDoc["status"] = "PROVISIONED_SUCCESS";
     resDoc["client_id"] = clientId;
     resDoc["machine_id"] = machineId;
@@ -425,7 +425,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
     Serial.print(F("[MQTT] Recebido em [")); Serial.print(topicStr); Serial.print(F("]: ")); Serial.println(message);
 
-    StaticJsonDocument<512> doc;
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, message);
 
     if (topicStr == topicSetupConfig) {
@@ -434,28 +434,26 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     }
 
     if (topicStr.endsWith("/cmd/open")) {
-        if (!error && doc.containsKey("box")) {
-            if (doc["box"].is<const char*>() && String(doc["box"].as<const char*>()) == "all") {
-                for (int b = 0; b < 4; b++) triggerBoxOpen(b, "MANUAL_ALL");
-            } else {
-                int b = doc["box"].as<int>() - 1;
-                triggerBoxOpen(b, "MANUAL");
-            }
+        if (!error && doc["box"].is<int>()) {
+            int b = doc["box"].as<int>() - 1;
+            triggerBoxOpen(b, "MANUAL");
+        } else if (!error && doc["box"].is<const char*>() && String(doc["box"].as<const char*>()) == "all") {
+            for (int b = 0; b < 4; b++) triggerBoxOpen(b, "MANUAL_ALL");
         }
     } else if (topicStr.endsWith("/cmd/mode")) {
         if (!error) {
-            if (doc.containsKey("modo")) modoAtivo = doc["modo"].as<String>();
-            if (doc.containsKey("intervalo_minutos")) intervaloDelayMinutos = doc["intervalo_minutos"].as<int>();
+            if (doc["modo"].is<const char*>() || doc["modo"].is<String>()) modoAtivo = doc["modo"].as<String>();
+            if (doc["intervalo_minutos"].is<int>()) intervaloDelayMinutos = doc["intervalo_minutos"].as<int>();
             saveStoredPreferences();
             publishFullState();
         }
     } else if (topicStr.endsWith("/cmd/schedule")) {
-        if (!error && doc.containsKey("box")) {
+        if (!error && doc["box"].is<int>()) {
             int b = doc["box"].as<int>() - 1;
             if (b >= 0 && b < 4) {
-                if (doc.containsKey("hora")) boxAgenda[b].hora = doc["hora"].as<int>();
-                if (doc.containsKey("minuto")) boxAgenda[b].minuto = doc["minuto"].as<int>();
-                if (doc.containsKey("ativo")) boxAgenda[b].ativo = doc["ativo"].as<bool>();
+                if (doc["hora"].is<int>()) boxAgenda[b].hora = doc["hora"].as<int>();
+                if (doc["minuto"].is<int>()) boxAgenda[b].minuto = doc["minuto"].as<int>();
+                if (doc["ativo"].is<bool>()) boxAgenda[b].ativo = doc["ativo"].as<bool>();
                 publishFullState();
             }
         }
@@ -504,7 +502,7 @@ void setup() {
     Serial.begin(115200);
     delay(100);
     Serial.println(F("\n=============================================="));
-    Serial.println(F(" GallopIT Firmware v2.1 (WiFi AP + MQTT Setup)"));
+    Serial.println(F(" GallopIT Firmware v2.1 (PlatformIO Build)   "));
     Serial.println(F("==============================================\n"));
 
     pinMode(LED_STATUS_PIN, OUTPUT);
