@@ -1,132 +1,188 @@
 # EquiLock: Sistema de Cavalariça Inteligente IoT
-## Manual do Utilizador e Guia de Operação
-**Versão 1.3**
+## Manual do Utilizador e Especificação Técnica de Comunicação MQTT
+**Versão 2.0 (Pronto para Escalabilidade Multi-Tenant)**
 
 ---
 
 ## 1. Introdução ao EquiLock
-Bem-vindo ao **EquiLock**, o seu sistema automatizado para gestão de baias (boxes) em cavalariças modernas. O EquiLock combina hardware de alta fiabilidade (fechaduras eletrónicas) com um painel de controlo web minimalista e acessível a partir de qualquer computador, tablet ou smartphone.
+O **EquiLock** é um sistema inteligente e automatizado para gestão de baias (boxes) em cavalariças modernas. O sistema combina hardware IoT de elevada fiabilidade (fechaduras solenoides e microcontroladores ESP32/ESP8266) com uma plataforma web responsiva acessível a partir de smartphones, tablets e computadores.
 
-Este manual explicará como operar o sistema no dia a dia, como configurar horários automáticos e o que significam os avisos visuais.
+A Versão 2.0 introduz arquitetura **Multi-Tenant (Múltiplos Clientes/Cavalariças)**, controlo de acessos baseado em papéis (RBAC) e comunicação MQTT hierárquica e escalável.
 
 ---
 
-## 2. O Hardware (O Armário e as Fechaduras)
-O cérebro físico do sistema está instalado no local e controla até **4 fechaduras (solenoides)**. Para garantir a sua segurança e a durabilidade do equipamento, o sistema possui regras físicas estritas:
+## 2. Perfis e Níveis de Acesso (RBAC)
 
-* **Atuação Segura (4 Segundos):** Sempre que uma porta é mandada abrir, a fechadura recebe energia apenas durante 4 segundos exatos. Isto impede o sobreaquecimento da fechadura e protege o sistema.
-* **LED de Sinalização (Luz de Aviso):** O sistema possui uma luz (LED) na porta ou painel principal que indica o estado atual do armário físico:
+O sistema divide a gestão em 3 perfis de utilizador:
+
+| Perfil | Acesso | Responsabilidades Principais |
+| :--- | :--- | :--- |
+| 🛡️ **DEVELOPER** *(Super Admin)* | Global | Registar novos armários/hardware (IDs e MAC Address), associar máquinas a novos clientes. |
+| 🏢 **CLIENT_ADMIN** *(Dono do Haras)* | Da Empresa | Gerir a sua cavalariça, criar contas para funcionários/tratadores, atribuir máquinas a utilizadores. |
+| 👨‍🌾 **OPERATOR** *(Tratador/Funcionário)* | Limitado | Operar as baias atribuídas (abertura manual, iniciar sequências diárias, consultar estado). |
+
+---
+
+## 3. O Hardware (Armário e Sinalização)
+
+O armário físico controla até **4 solenoides (fechaduras de baias)** e possui mecanismos rígidos de proteção elétrica:
+
+* **Atuação Segura (4 Segundos):** Cada solenoide é energizado por exatos **4 segundos**. Após este tempo, a alimentação é cortada automaticamente para evitar sobreaquecimento da bobina.
+* **Proteção Anti-Spam:** O hardware e a interface ignoram comandos repetidos num intervalo inferior a 4 segundos.
+
+### Tabela de Diagnósticos do LED de Sinalização
+O LED instalado no armário físico comunica o estado do equipamento em tempo real:
 
 | Sinal do LED | Significado | Ação Recomendada |
 | :--- | :--- | :--- |
-| **Piscar Lento** | O sistema está à procura de rede Wi-Fi ou perdeu a ligação temporariamente. | Verificar roteador/sinal de rede. |
-| **Fixo por 3 segundos** | O sistema acabou de ligar à rede com sucesso. | Nenhuma (indicação de pronto). |
-| **Piscar Rápido (Aviso Prévio)** | O sistema avisa que uma porta se vai abrir dentro de 5 segundos. | **Afaste-se da porta imediatamente.** |
-| **Aceso Fixo (4s)** | Uma fechadura está neste momento a ser aberta. | Aguardar a conclusão da abertura. |
-| **Apagado** | O sistema está ligado e à espera de ordens. | Funcionamento normal em standby. |
+| 🟡 **Piscar Lento** | À procura de rede Wi-Fi / Reconexão MQTT. | Verificar o router e sinal de internet local. |
+| 🟢 **Fixo por 3 segundos** | Ligação bem-sucedida à rede e ao broker MQTT. | Nenhuma (sistema pronto a operar). |
+| ⚡ **Piscar Rápido (5s)** | **Aviso Prévio:** Uma porta vai abrir dentro de 5 segundos. | **Afaste-se da baia imediatamente.** |
+| 🔴 **Aceso Fixo (4s)** | Uma fechadura solenoide está ativa neste momento. | Aguardar conclusão da abertura. |
+| ⚪ **Apagado** | Armário ligado e em standby normal. | Funcionamento regular. |
 
 ---
 
-## 3. O Painel de Controlo Web (Dashboard)
-Para controlar as baias, basta aceder à página web do EquiLock. O design foi pensado para ser limpo e organizado.
+## 4. Modos de Operação (Painel Web)
 
-### 3.1. Status de Conexão
-No topo da página (e no menu de Controlo Manual), verá a indicação do Status do Sistema:
-* 🟢 **Online:** O painel web e o armário físico estão a comunicar perfeitamente. Pode enviar ordens.
-* 🔴 **Offline:** O armário físico está sem energia ou sem internet.
-  > [!WARNING]
-  > Se o sistema estiver **Offline**, o painel web ficará bloqueado (esmaecido) para evitar que envie comandos que não serão recebidos pelo hardware físico.
-
-### 3.2. Menu de Navegação
-No canto superior direito, encontrará um **Ícone de Menu (Hamburger)**. Ao clicar nele, terá acesso às 4 áreas principais do sistema (Modos de Operação).
-
----
-
-## 4. Modos de Operação (As 4 Abas)
+O Dashboard organiza-se em **4 áreas principais**:
 
 ### Aba 1: Controlo Manual
-Esta é a vista principal, usada para abrir as portas de forma imediata.
-* Verá 4 cartões perfeitamente limpos, representando da **Box 1** à **Box 4**.
-* **Como usar:** Clique no botão verde **"Abrir Box"**.
-* **O que acontece:** O botão ficará desativado por 4 segundos (para garantir a segurança elétrica) e ouvirá/verá a fechadura física abrir. Este evento fica registado na base de dados para segurança.
+* Exibe os cartões das **Boxes 1 a 4**.
+* Clique em **"Abrir Box"** para acionar a fechadura correspondente.
+* O botão fica temporariamente desativado durante 4 segundos com contagem decrescente visual.
 
 ### Aba 2: Sequência Diária (Modo Delay)
-Ideal para a hora de alimentação ou saída coordenada dos cavalos. O sistema abre a Box 1, aguarda um tempo, abre a Box 2, e assim por diante.
-* **Configurar o Tempo:** Existe um campo **"Intervalo (minutos)"**. Digite o tempo de espera desejado entre cada abertura (ex: `5` para 5 minutos) e guarde.
-* **Como usar:** Clique no botão verde **"Iniciar Sequência"**.
-* **O que acontece:** A Box 1 abre imediatamente. Daí a 5 minutos, o armário dá um aviso visual (LED a piscar rápido por 5 segundos) e abre a Box 2. O processo repete-se sucessivamente até à Box 4.
+* Ideal para momentos de alimentação ou saída coordenada de cavalos.
+* Configura-se o **Intervalo (em minutos)** entre a abertura de cada box (ex: 5 minutos).
+* Ao clicar em **"Iniciar Sequência"**, a Box 1 abre imediatamente. Após o tempo configurado (com 5s de aviso prévio por LED pisca-rápido), a Box 2 abre, repetindo-se até à Box 4.
 
-### Aba 3: Agendamento
-Esta secção transforma a cavalariça num sistema 100% autónomo. Cada box abrirá todos os dias a uma hora exata definida por si.
-* Verá uma lista com as 4 Boxes.
-* **Como usar:** Em cada Box, existe um campo de seleção de hora e minuto. Escolha a hora desejada (ex: `07:30` para o pequeno-almoço) e clique em **"Atualizar"**.
-* Ao lado de cada Box, aparecerá uma pequena etiqueta a indicar o horário que o armário tem atualmente guardado na sua memória.
-  > [!NOTE]
-  > O sistema sincroniza o relógio automaticamente com a Internet (NTP), garantindo pontualidade.
+### Aba 3: Agendamento (Modo Agenda)
+* Torna a cavalariça 100% autónoma.
+* Define-se a hora e minuto diários (HH:MM) para a abertura automática de cada box (ex: `07:30`).
+* O armário sincroniza as horas com a internet via **NTP**, garantindo pontualidade absoluta.
 
 ### Aba 4: Histórico & Sistema
-A área de supervisão, auditoria e configurações globais.
-* **Histórico de Eventos:** Mostra uma lista cronológica das últimas ações. Permite saber, por exemplo, se a *"Box 1"* foi aberta às 08:00, e se foi aberta de forma *"Manual"* por um funcionário ou via *"Agendamento Automático"*.
-* **Alternar Modo Principal:** Um interruptor (switch) permite-lhe definir qual o modo autónomo que o armário deve obedecer por defeito: o **Modo Sequência (Delay)** ou o **Modo Agendamento**.
+* **Histórico de Auditoria:** Regista quem abriu cada box, a hora exata e a origem (Manual, Sequência ou Agenda).
+* **Modo Padrão Autónomo:** Chave seletora que define qual o modo autónomo padrão (`DELAY` ou `AGENDA`) caso haja reinício do armário.
 
 ---
 
-## 5. Resiliência: O que acontece se algo falhar?
-O EquiLock foi desenhado para ser extremamente seguro e não bloquear em caso de anomalias:
+## 5. Resiliência e Operação Offline
 
-* **Corte de Energia:** Se a eletricidade falhar, as fechaduras mantêm-se trancadas mecanicamente. Quando a energia voltar, o armário retoma instantaneamente as configurações anteriores (pois grava tudo na sua memória EEPROM/Flash interna permanente). O painel web voltará a indicar "Online".
-* **Perda de Internet (Wi-Fi):** Se a rede Wi-Fi da cavalariça cair, o painel web vai mostrar "Offline". No entanto, o armário não para de funcionar. Se tiver horários agendados ou uma sequência a decorrer, ele executará essas tarefas de forma autónoma através do seu relógio interno temporário.
-* **Toques Duplos (Spam de Cliques):** A interface web e o hardware bloqueiam cliques rápidos repetidos no botão "Abrir", prevenindo sobrecargas no sistema elétrico.
+* **Corte de Energia:** As fechaduras mantêm-se trancadas mecanicamente. As definições são guardadas na memória não-volátil (EEPROM/Preferences). Ao regressar a energia, o armário retoma o estado anterior.
+* **Perda de Internet/Wi-Fi:** Se a ligação Wi-Fi falhar, a interface web mostra a máquina como **Offline**. Contudo, o armário continua a executar as suas rotinas e agendamentos autonomamente usando o seu relógio interno.
 
 ---
 
-## 6. Referência Técnico (Triagem e Diagnóstico)
-Esta secção destina-se a técnicos e administradores de sistema para efeitos de diagnóstico. O sistema baseia-se no protocolo **MQTT** para comunicação.
+## 6. Referência Técnica: Protocolo de Comunicação MQTT
 
-### Tópicos de Comando (Painel Web $\rightarrow$ Armário)
-* `armario/comando/manutencao`
-  * **Payload:** `"ON"`
-  * **Descrição:** Atua as 4 fechaduras simultaneamente (durante 4 segundos).
-* `armario/comando/sequencia`
-  * **Payload:** `"START"`
-  * **Descrição:** Inicia o ciclo do Modo Delay (Sequência Diária).
-* `armario/comando/status`
-  * **Payload:** `"GET"`
-  * **Descrição:** Pede ao armário para forçar o reenvio de toda a sua configuração atual.
+A comunicação entre a Web e os Armários é realizada via protocolo **MQTT sobre WebSockets** (porta `9001`/`wss`).
 
-### Tópicos de Configuração (Painel Web $\rightarrow$ Armário)
-* `armario/config/modo`
-  * **Payload:** `"DELAY"` ou `"AGENDA"`
-  * **Descrição:** Altera o modo de operação ativo.
-* `armario/config/delay`
-  * **Payload:** `{"minutos": <inteiro>}` (Ex: `{"minutos": 5}`)
-  * **Descrição:** Define o intervalo de tempo da sequência diária.
-* `armario/config/agenda`
-  * **Payload:** `{"prateleira": <1 a 4>, "hora": <0 a 23>, "minuto": <0 a 59>}`
-  * **Descrição:** Define o horário de abertura de uma baia específica.
+### 6.1. Estrutura Padrão dos Tópicos (Multi-Tenant)
+```text
+equilock / {client_id} / {machine_id} / {direcao} / {acao}
+```
 
-### Tópicos de Status (Armário $\rightarrow$ Painel Web)
-* `armario/status/conexao`
-  * **Payload:** `"online"` ou `"offline"`
-  * **Descrição:** Gerido por LWT (Last Will and Testament) para indicar o estado de presença do equipamento físico.
-* `armario/status/notificacao`
-  * **Payload:** Texto simples (ex: `"Sequência concluída. Prateleira 4 aberta."`)
-  * **Descrição:** Mensagens de log rápidas de eventos.
-* `armario/status/atual`
-  * **Payload:** Documento JSON completo.
-  * **Descrição:** Enviado sempre que a configuração é alterada, garantindo a sincronização do painel web.
-  * **Exemplo de Payload:**
-    ```json
-    {
-      "modo": "DELAY",
-      "delay_minutos": 5,
-      "prateleira_no_momento": 0,
-      "sequencia_ativa": false,
-      "agenda": [
-        {"prateleira": 1, "hora": 14, "minuto": 30, "ativo": true},
-        {"prateleira": 2, "hora": 18, "minuto": 0, "ativo": true},
-        {"prateleira": 3, "hora": -1, "minuto": -1, "ativo": false},
-        {"prateleira": 4, "hora": -1, "minuto": -1, "ativo": false}
-      ]
-    }
-    ```
+* `{client_id}`: Identificador único do cliente/haras no Supabase (ex: `haras_do_sol`).
+* `{machine_id}`: Identificador do armário físico (ex: `eq_001`).
+
+---
+
+### 6.2. Tópicos de Comando (Web Dashboard $\rightarrow$ Armário ESP32)
+
+#### 1. Abertura Manual de Box
+* **Tópico:** `equilock/{client_id}/{machine_id}/cmd/open`
+* **Payload JSON:**
+  ```json
+  {
+    "box": 1,
+    "user_id": "usr_9981",
+    "timestamp": 1770932000
+  }
+  ```
+  *(Nota: Para abrir todas as boxes em manutenção, passar `"box": "all"`).*
+
+#### 2. Alteração de Modo de Operação
+* **Tópico:** `equilock/{client_id}/{machine_id}/cmd/mode`
+* **Payload JSON:**
+  ```json
+  {
+    "modo": "DELAY",
+    "intervalo_minutos": 5
+  }
+  ```
+
+#### 3. Configuração de Agendamento
+* **Tópico:** `equilock/{client_id}/{machine_id}/cmd/schedule`
+* **Payload JSON:**
+  ```json
+  {
+    "box": 1,
+    "hora": 7,
+    "minuto": 30,
+    "ativo": true
+  }
+  ```
+
+#### 4. Pedido de Estado Atual (Force Refresh)
+* **Tópico:** `equilock/{client_id}/{machine_id}/cmd/status_get`
+* **Payload JSON:** `{}`
+
+---
+
+### 6.3. Tópicos de Status e Telemetria (Armário ESP32 $\rightarrow$ Web Dashboard)
+
+#### 1. Presença e Estado de Ligação (MQTT LWT - Last Will)
+* **Tópico:** `equilock/{client_id}/{machine_id}/status/presence`
+* **Payload Simples:** `"online"` ou `"offline"`
+* **Nota:** O broker envia automaticamente `"offline"` se a ESP32 perder a ligação abruptamente.
+
+#### 2. Estado Completo do Sistema (Retained Message)
+* **Tópico:** `equilock/{client_id}/{machine_id}/status/state`
+* **Payload JSON Completo:**
+  ```json
+  {
+    "client_id": "haras_do_sol",
+    "machine_id": "eq_001",
+    "modo_ativo": "DELAY",
+    "intervalo_minutos": 5,
+    "sequencia_em_execucao": false,
+    "box_atual_sequencia": 0,
+    "boxes": [
+      {"box": 1, "hora": 7, "minuto": 30, "ativo": true, "status": "FECHADA"},
+      {"box": 2, "hora": 8, "minuto": 0, "ativo": true, "status": "FECHADA"},
+      {"box": 3, "hora": 12, "minuto": 30, "ativo": true, "status": "FECHADA"},
+      {"box": 4, "hora": 19, "minuto": 0, "ativo": true, "status": "FECHADA"}
+    ],
+    "firmware_version": "2.0.0",
+    "wifi_rssi": -62
+  }
+  ```
+
+#### 3. Notificação de Eventos em Tempo Real
+* **Tópico:** `equilock/{client_id}/{machine_id}/status/event`
+* **Payload JSON:**
+  ```json
+  {
+    "evento": "BOX_OPENED",
+    "box": 1,
+    "origem": "MANUAL",
+    "user": "João Silva",
+    "timestamp": 1770932005,
+    "mensagem": "Box 1 aberta com sucesso por comando manual."
+  }
+  ```
+
+---
+
+## 7. Resumo de Subscrições para a Aplicação Web
+
+Quando o utilizador faz login na plataforma web:
+
+* **Operador (Acede à Máquina `eq_001`):**
+  * Subscreve a: `equilock/haras_do_sol/eq_001/status/#`
+* **Client Admin (Visualiza todas as máquinas do Haras):**
+  * Subscreve a: `equilock/haras_do_sol/+/status/#`
+* **Developer (Monitoriza a frota global de 100+ máquinas):**
+  * Subscreve a: `equilock/+/+/status/presence`
