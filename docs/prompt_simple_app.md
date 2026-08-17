@@ -39,13 +39,17 @@ A aplicação deve ligar-se diretamente a um Broker MQTT público via WebSockets
    * Botão **"Abrir Todas as Boxes"** (envia `{"box": "all"}` para o comando de open).
    * Botão **"Armar Todas as Boxes"** (envia `{"box": "all"}` para o comando de arm).
 
-3. **Cartões das 4 Boxes (Grid 2x2 ou Coluna Única em telemóvel):**
-   * Cada cartão representa uma Box (1 a 4).
-   * **Estado Lógico:** Indica se a porta está 🔴 `ABERTA` ou 🟢 `ARMADA`.
-   * **Ação Dinâmica:**
-     * Se estiver 🔴 `ABERTA`: Botão verde **"Armar Box"** (envia comando `/cmd/arm`).
-     * Se estiver 🟢 `ARMADA`: Botão verde **"Abrir Box"** (envia comando `/cmd/open`).
-   * **Contagem Decrescente:** Se a box receber feedback de atuação (`rele_ativo` for `true`), o botão deve ficar desativado e mostrar uma contagem decrescente visual de **4 segundos**.
+3. **Painel Visual do Armário (Layout Vertical):**
+   * Um contentor vertical central estilizado representando o armário físico em si.
+   * O armário deve ser dividido em 4 secções horizontais empilhadas (Prateleiras 1 a 4, de cima para baixo).
+   * Cada prateleira exibe de forma alinhada:
+     * O número e nome (ex: **Prateleira 1**, **Prateleira 2**, etc.).
+     * Indicador de estado visual (🔴 `ABERTA` ou 🟢 `ARMADA`).
+     * Informações de agendamento compacto (ex: `⏰ 07:30`).
+     * Botão de ação integrado na linha da prateleira:
+       * Se estiver 🔴 `ABERTA`: Botão verde **"Armar"** (envia comando `/cmd/arm`).
+       * Se estiver 🟢 `ARMADA`: Botão verde **"Abrir"** (envia comando `/cmd/open`).
+     * **Contagem Decrescente:** Se a prateleira receber feedback de atuação (`rele_ativo` for `true`), a secção da prateleira deve exibir um aviso de abertura com uma contagem decrescente visual de **4 segundos** (bloqueando o botão nesse período).
 
 4. **Painel de Configuração Básica:**
    * **Modo de Operação:** Toggle ou interruptor simples para alternar entre o Modo `DELAY` (Sequencial) e `AGENDA` (Agendamento).
