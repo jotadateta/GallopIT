@@ -590,7 +590,7 @@ void processAgendaLogic() {
             }
         }
         if (timeinfo.tm_hour == 0 && timeinfo.tm_min == 0) {
-            boxAgenda[i].abertaHoje = false;
+            boxes[i].abertaHoje = false;
         }
     }
 }
