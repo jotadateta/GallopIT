@@ -1,7 +1,7 @@
 /**
- * GallopIT Firmware v2.2 - ESP32
- * Sistema de Cavalariça Inteligente IoT
- * Suporte para Buffer Estendido PubSubClient (1024 Bytes), Estado Lógico Latch & Ping Mode
+ * GallopIT Firmware v2.3 - ESP32
+ * Sistema de Cavalariça Inteligente IoT (Edição Piloto MVP com Suporte Simplificado para Apps MQTT Mobile)
+ * Suporte para Buffer Estendido (1024B), Tópicos Diretos de Box (/box/X/open, /box/X/arm, /box/X/status), Estado Latch & Captive Portal
  */
 
 #include <WiFi.h>
@@ -80,6 +80,7 @@ String topicDiscovery = "gallopit/discovery/announcement";
 String topicSetupConfig;
 String topicSetupStatus;
 String topicCmd;
+String topicBoxWildcard;
 String topicStatusPresence;
 String topicStatusState;
 String topicStatusEvent;
@@ -164,6 +165,7 @@ void setupMQTTTopics() {
 
     String base = String(SYSTEM_PREFIX) + "/" + clientId + "/" + machineId;
     topicCmd = base + "/cmd/#";
+    topicBoxWildcard = base + "/box/#";
     topicStatusPresence = base + "/status/presence";
     topicStatusState = base + "/status/state";
     topicStatusEvent = base + "/status/event";
@@ -281,7 +283,7 @@ void publishDiscoveryAnnouncement() {
     doc["mac_clean"] = macAddressClean;
     doc["setup_topic"] = topicSetupConfig;
     doc["provisioned"] = isProvisioned;
-    doc["firmware"] = "2.2.0-ESP32";
+    doc["firmware"] = "2.3.0-ESP32-MVP";
 
     String output;
     serializeJson(doc, output);
@@ -303,6 +305,7 @@ void reconnectMQTT() {
             client.publish(topicStatusPresence.c_str(), "online", true);
             client.subscribe(topicSetupConfig.c_str());
             client.subscribe(topicCmd.c_str());
+            client.subscribe(topicBoxWildcard.c_str());
 
             currentLedState = LED_STATE_READY_3S;
             ledStateTimer = millis() + 3000;
@@ -330,7 +333,7 @@ void publishFullState() {
     doc["modo_ativo"] = modoAtivo;
     doc["intervalo_minutos"] = intervaloDelayMinutos;
     doc["sequencia_em_execucao"] = sequenciaEmExecucao;
-    doc["firmware"] = "2.2.0-ESP32";
+    doc["firmware"] = "2.3.0-ESP32-MVP";
     doc["wifi_rssi"] = WiFi.RSSI();
 
     JsonArray boxesArr = doc["boxes"].to<JsonArray>();
@@ -342,6 +345,10 @@ void publishFullState() {
         b["ativo"] = boxes[i].ativo;
         b["rele_ativo"] = (relayStopTimes[i] > 0);
         b["status"] = boxes[i].aberta ? "ABERTA" : "ARMADA";
+
+        String boxStatusTopic = String(SYSTEM_PREFIX) + "/" + clientId + "/" + machineId + "/box/" + String(i + 1) + "/status";
+        String statusStr = boxes[i].aberta ? "ABERTA" : "ARMADA";
+        client.publish(boxStatusTopic.c_str(), statusStr.c_str(), true);
     }
 
     String output;
@@ -394,6 +401,7 @@ void processProvisioningConfig(JsonDocument& doc) {
 
     setupMQTTTopics();
     client.subscribe(topicCmd.c_str());
+    client.subscribe(topicBoxWildcard.c_str());
 
     JsonDocument resDoc;
     resDoc["status"] = "PROVISIONED_SUCCESS";
@@ -486,6 +494,30 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
         return;
     }
 
+    String boxPrefix = String(SYSTEM_PREFIX) + "/" + clientId + "/" + machineId + "/box/";
+    if (topicStr.startsWith(boxPrefix)) {
+        String subPath = topicStr.substring(boxPrefix.length());
+        if (subPath == "all/open") {
+            for (int b = 0; b < 4; b++) triggerBoxOpen(b, "APP_DIRECT_ALL");
+            return;
+        } else if (subPath == "all/arm") {
+            armBox(-1, "APP_DIRECT_ARM_ALL");
+            return;
+        } else if (subPath.length() >= 6) {
+            char bChar = subPath.charAt(0);
+            if (bChar >= '1' && bChar <= '4') {
+                int bIndex = bChar - '1';
+                if (subPath.endsWith("/open")) {
+                    triggerBoxOpen(bIndex, "APP_DIRECT");
+                    return;
+                } else if (subPath.endsWith("/arm")) {
+                    armBox(bIndex, "APP_DIRECT_ARM");
+                    return;
+                }
+            }
+        }
+    }
+
     if (topicStr.endsWith("/cmd/open")) {
         if (!error && doc["box"].is<int>()) {
             int b = doc["box"].as<int>() - 1;
@@ -558,7 +590,7 @@ void processAgendaLogic() {
             }
         }
         if (timeinfo.tm_hour == 0 && timeinfo.tm_min == 0) {
-            boxes[i].abertaHoje = false;
+            boxAgenda[i].abertaHoje = false;
         }
     }
 }
@@ -569,7 +601,7 @@ void setup() {
     Serial.begin(115200);
     delay(100);
     Serial.println(F("\n=============================================="));
-    Serial.println(F(" GallopIT Firmware v2.2 (Buffer 1024B Fix)   "));
+    Serial.println(F(" GallopIT Firmware v2.3 (Mobile App MVP)     "));
     Serial.println(F("==============================================\n"));
 
     pinMode(LED_STATUS_PIN, OUTPUT);
