@@ -1,0 +1,189 @@
+\documentclass[11pt,a4paper]{article}
+
+% --- Pacotes Essenciais ---
+\usepackage[utf8]{utf8}
+\usepackage[portuguese]{babel}
+\usepackage[margin=2cm]{geometry}
+\usepackage{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+
+% --- Definição de Cores ---
+\definecolor{gallopblue}{RGB}{20, 50, 90}
+\definecolor{gallopgreen}{RGB}{34, 139, 34}
+\definecolor{gallopred}{RGB}{178, 34, 34}
+\definecolor{gallopyellow}{RGB}{218, 165, 32}
+\definecolor{lightgray}{RGB}{245, 247, 250}
+
+% --- Configuração de Caixas Destacadas ---
+\tcbuselibrary{skins}
+\newtcolorbox{noteBox}[1]{
+  colback=lightgray,
+  colframe=gallopblue,
+  fonttitle=\bfseries\color{white},
+  title=#1,
+  arc=3mm,
+  boxrule=1pt
+}
+
+\newtcolorbox{alertBox}[1]{
+  colback=red!5!white,
+  colframe=gallopred,
+  fonttitle=\bfseries\color{white},
+  title=#1,
+  arc=3mm,
+  boxrule=1pt
+}
+
+% --- Cabeçalho e Rodapé ---
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\textbf{GallopIT v2.3} -- Manual de Instalação e Operação}
+\rhead{\textcolor{gallopblue}{\textbf{Edição Piloto MVP}}}
+\cfoot{\thepage}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=gallopblue,
+    urlcolor=gallopblue
+}
+
+\begin{document}
+
+% --- Capa / Cabeçalho Principal ---
+\begin{center}
+    {\Huge \textbf{\textcolor{gallopblue}{GallopIT -- Cavalariça Inteligente IoT}}}\\[0.3cm]
+    {\Large \textbf{Manual Prático de Instalação, Operação e Diagnóstico Telefónico}}\\[0.2cm]
+    {\small \textbf{Versão 2.3 MVP | Sistema Autónomo de Baias}}\\
+    \hrulefill
+\end{center}
+
+\vspace{0.3cm}
+
+% --- SEÇÃO 1: GUIA DO TÉCNICO INSTALADOR ---
+\section*{\textcolor{gallopblue}{1. Guia do Técnico Instalador (Montagem \& Setup no Local)}}
+
+Este capítulo destina-se ao técnico responsável pela montagem física da caixa de controlo e configuração inicial da rede Wi-Fi na cavalariça do cliente.
+
+\subsection*{1.1. Esquema de Ligações Elétricas}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Alimentação Principal:} Ligar a fonte de \textbf{12V DC (mínimo 3A)} à entrada da caixa. O módulo Step-Down / VIN reduz a voltagem para 5V limpos para alimentar o ESP32.
+    \item \textbf{Placa de Relés Active-LOW:}
+    \begin{itemize}
+        \item Pino \textbf{NO} \textit{(Normally Open)} de cada relé $\rightarrow$ Polo Positivo (+12V) da fonte.
+        \item Pino \textbf{COM} de cada relé $\rightarrow$ Polo Positivo (+) da respetiva fechadura solenoide (Boxes 1 a 4).
+        \item Polo Negativo (-) das fechaduras $\rightarrow$ Barramento \textbf{GND Comum} da fonte de 12V.
+    \end{itemize}
+    \item \textbf{LED de Sinalização:} Ligar a perna positiva (Anodo) ao pino \textbf{GPIO 2} através de uma resistência de $220\,\Omega$, e a perna negativa (Catodo) ao \textbf{GND}.
+\end{itemize}
+
+\subsection*{1.2. Configuração do Wi-Fi no Local (Captive Portal)}
+Quando o equipamento é ligado pela primeira vez no cliente e não encontra rede configurada, o LED piscará lentamente (Modo AP Setup):
+\begin{enumerate}[leftmargin=*]
+    \item No smartphone do técnico, ligar ao Wi-Fi criado pela caixa:
+    \begin{itemize}
+        \item \textbf{Nome da Rede (SSID):} \texttt{GallopIT-Setup-[MAC\_ADDRESS]}
+        \item \textbf{Palavra-passe:} \texttt{gallopit123}
+    \end{itemize}
+    \item O portal abre automaticamente. Caso contrário, aceder a \url{http://192.168.4.1} no navegador.
+    \item Preencher o formulário:
+    \begin{itemize}
+        \item \textbf{Nome da Rede Wi-Fi (SSID):} Nome da rede Wi-Fi do cliente.
+        \item \textbf{Palavra-passe do Wi-Fi:} Password da rede do cliente.
+        \item \textbf{ID do Cliente:} Nome da quinta (ex: \texttt{quinta\_do\_sol}).
+        \item \textbf{ID da Máquina:} Identificador do armário (ex: \texttt{box\_principal\_01}).
+    \end{itemize}
+    \item Clicar em \textbf{"Guardar e Reiniciar"}. O equipamento reinicia e liga-se à rede do cliente.
+\end{enumerate}
+
+\subsection*{1.3. Configuração da App Mobile MQTT no Telemóvel do Cliente}
+Instalar a aplicação gratuita \textbf{IoT MQTT Panel} (disponível para Android e iOS) no telemóvel do cliente:
+\begin{enumerate}[leftmargin=*]
+    \item Criar uma Conexão: Broker = \texttt{broker.emqx.io} | Porta = \texttt{1883} | Client ID = \texttt{GallopIT-ClientApp}.
+    \item Adicionar os botões de atalho rápido (substituindo \texttt{\{cliente\}} e \texttt{\{maquina\}}):
+\end{enumerate}
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Painel / Botão} & \textbf{Tipo de Botão} & \textbf{Tópico MQTT} & \textbf{Payload} \\ \midrule
+Status Conexão & LED / Indicator & \texttt{gallopit/\{cliente\}/\{maquina\}/status/presence} & \texttt{online} / \texttt{offline} \\
+Abrir Box 1 (4s) & Button / Pulse & \texttt{gallopit/\{cliente\}/\{maquina\}/box/1/open} & \texttt{\{\}} \\
+Armar Box 1 & Button / Switch & \texttt{gallopit/\{cliente\}/\{maquina\}/box/1/arm} & \texttt{\{\}} \\
+Status Box 1 & Text / Indicator & \texttt{gallopit/\{cliente\}/\{maquina\}/box/1/status} & \textit{ABERTA / ARMADA} \\
+\midrule
+Abrir TODAS & Master Button & \texttt{gallopit/\{cliente\}/\{maquina\}/box/all/open} & \texttt{\{\}} \\
+Armar TODAS & Master Button & \texttt{gallopit/\{cliente\}/\{maquina\}/box/all/arm} & \texttt{\{\}} \\ \bottomrule
+\end{tabular}
+\caption{Mapeamento de Tópicos para a App Mobile do Cliente}
+\end{table}
+
+\newpage
+
+% --- SEÇÃO 2: GUIA PRÁTICO DO CLIENTE ---
+\section*{\textcolor{gallopblue}{2. Guia de Operação do Cliente (Utilizador \& Tratador)}}
+
+\subsection*{2.1. Como Funciona a Abertura e o Armamento}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Abrir a Box (Botão "Abrir"):} Ao clicar em "Abrir Box X" na App, a fechadura solenoide é energizada durante \textbf{4 segundos exatos} (tempo suficiente para soltar a porta da baia). O estado da box na App passa a \textbf{\textcolor{gallopred}{ABERTA}}.
+    \item \textbf{Armar a Box (Botão "Armar"):} Após o cavalo ser alimentado e a porta ser fechada fisicamente pelo tratador, este clica no botão "Armar Box X" na App. O estado passa a \textbf{\textcolor{gallopgreen}{ARMADA}} (pronta para o próximo ciclo).
+\end{itemize}
+
+\subsection*{2.2. Guia de Diagnóstico do LED de Sinalização no Armário}
+O LED no painel do armário físico indica o estado do sistema em tempo real:
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{@{}llp{8cm}@{}}
+\toprule
+\textbf{Estado do LED} & \textbf{Significado} & \textbf{Ação Esperada} \\ \midrule
+🟡 \textbf{Piscar Lento} & Sem Wi-Fi / Modo Setup Ativo & Verificar se o router do cliente está ligado ou reconfigurar Wi-Fi. \\
+🟢 \textbf{Fixo por 3 segundos} & Conetado com Sucesso & Equipamento operacional e pronto a usar. \\
+⚡ \textbf{Piscar Rápido (5s)} & Aviso Prévio de Abertura & Uma porta vai abrir dentro de 5s. Afastar pessoas da baia! \\
+🔴 \textbf{Aceso Fixo (4s)} & Solenoide Ativo & Fechadura a abrir. \\
+⚪ \textbf{Apagado} & Standby Normal & Equipamento ligado e em repouso. \\ \bottomrule
+\end{tabular}
+\caption{Tabela de Diagnóstico por LED}
+\end{table}
+
+\begin{noteBox}{Proteção Contra Falhas de Energia (Memória Flash NVS)}
+Se a eletricidade da cavalariça falhar, o GallopIT \textbf{não perde as configurações nem o estado das baias}. Ao regressar a energia, o equipamento reconeta-se automaticamente ao Wi-Fi e lembra-se de quais as caixas que estavam \textbf{ABERTAS} e \textbf{ARMADAS}!
+\end{noteBox}
+
+\vspace{0.4cm}
+
+% --- SEÇÃO 3: DIAGNÓSTICO TELEFÓNICO E RESOLUÇÃO DE PROBLEMAS ---
+\section*{\textcolor{gallopblue}{3. Guia de Diagnóstico Telefónico (Suporte \& Troubleshooting)}}
+
+Esta secção permite resolver 95\% dos problemas através de uma simples chamada telefónica com o cliente.
+
+\begin{alertBox}{Regra de Ouro do Suporte Telefónico}
+Antes de deslocar um técnico ao local, perguntar sempre ao cliente: \textbf{"Qual é a cor e o ritmo do piscar do LED no armário?"}
+\end{alertBox}
+
+\subsection*{3.1. Árvore de Resolução de Problemas por Telefone}
+
+\small
+\begin{table}[h!]
+\centering
+\begin{tabular}{@{}p{3.5cm}p{4cm}p{7.5cm}@{}}
+\toprule
+\textbf{O Cliente Diz que...} & \textbf{Causa Provável} & \textbf{Instrução para Dar ao Cliente pelo Telefone} \\ \midrule
+"Clico na App e nada acontece. O LED do armário está apagado." & Falha de corrente no armário ou transformador desligado. & 1. Verificar se o transformador de 12V está bem encaixado na tomada.\newline 2. Confirmar se a tomada tem eletricidade. \\ \midrule
+"Clico na App, não abre e o LED está a \textbf{piscar lentamente}." & O armário perdeu a ligação ao Wi-Fi da cavalariça. & 1. Reiniciar o router Wi-Fi do cliente.\newline 2. Se mudou a password do Wi-Fi, aceder com o telemóvel à rede \texttt{GallopIT-Setup} e entrar em \url{http://192.168.4.1} para atualizar a password. \\ \midrule
+"A fechadura abre, mas o estado na App diz \textbf{ABERTA}." & Funcionamento normal. O solenoide já desligou (4s). & Explicar ao cliente que após fechar a porta com a mão, deve clicar no botão \textbf{"Armar Box"} na App para o status voltar a ficar verde (ARMADA). \\ \midrule
+"Na App o estado diz \textbf{OFFLINE}." & O telemóvel do cliente está sem internet ou o armário desligou-se. & 1. Pedir ao cliente para verificar se o telemóvel tem dados/Wi-Fi.\newline 2. Pedir para fechar e reabrir a App MQTT. \\ \midrule
+"A fechadura faz um estalido mas não puxa o trinco." & Voltagem insuficiente na fonte de 12V ou peso na porta. & 1. Aliviar a pressão física sobre a porta da baia enquanto clica no botão.\newline 2. Verificar se a fonte de alimentação é de pelo menos 12V 2A-3A. \\ \bottomrule
+\end{tabular}
+\caption{Matriz de Diagnóstico e Resolução Telefónica}
+\end{table}
+
+\end{document}
