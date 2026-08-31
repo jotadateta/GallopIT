@@ -116,16 +116,6 @@ void loadStoredPreferences() {
 
     wifiSSID = preferences.getString("wifi_ssid", DEFAULT_WIFI_SSID);
     wifiPass = preferences.getString("wifi_pass", DEFAULT_WIFI_PASS);
-
-    // Limpa credenciais antigas de teste (ex: "MEO-5E3030") se existirem na NVS Flash para permitir treino do zero
-    if (wifiSSID == "MEO-5E3030") {
-        wifiSSID = "";
-        wifiPass = "";
-        preferences.putString("wifi_ssid", "");
-        preferences.putString("wifi_pass", "");
-        Serial.println(F("[NVS] Credenciais de teste antigas limpas! Modo Fabril ativado."));
-    }
-
     clientId = preferences.getString("client_id", DEFAULT_CLIENT_ID);
     machineId = preferences.getString("machine_id", DEFAULT_MACHINE_ID);
     isProvisioned = preferences.getBool("provisioned", false);
