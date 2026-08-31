@@ -30,8 +30,8 @@ export class GallopItMqttClient {
   private brokerPath: string = '/mqtt';
   private useSSL: boolean = true;
 
-  public clientId: string = 'haras_quinta_do_sol';
-  public machineId: string = 'box_principal_01';
+  public clientId: string = 'Emanuel';
+  public machineId: string = 'Maquina1';
 
   private status: 'connecting' | 'online' | 'offline' | 'disconnected' = 'disconnected';
   private pingStartTime: number = 0;

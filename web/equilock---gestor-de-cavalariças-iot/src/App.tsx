@@ -54,8 +54,8 @@ interface LogEntry {
 
 export default function App() {
   // 1. Connection Target Settings
-  const [clientId, setClientId] = useState('haras_quinta_do_sol');
-  const [machineId, setMachineId] = useState('box_principal_01');
+  const [clientId, setClientId] = useState('Emanuel');
+  const [machineId, setMachineId] = useState('Maquina1');
 
   // Connection & Latency Status
   const [statusConexao, setStatusConexao] = useState<'connecting' | 'online' | 'offline' | 'disconnected'>('disconnected');
