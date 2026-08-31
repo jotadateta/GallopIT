@@ -205,18 +205,29 @@ export class GallopItMqttClient {
     else if (topic === `${baseTopic}/event`) {
       try {
         const evt = JSON.parse(payloadStr);
-        if (evt.event === 'PONG' || evt.type === 'PONG') {
+        if (evt.evento === 'PONG' || evt.event === 'PONG' || evt.type === 'PONG') {
+          if (this.pingTimer) {
+            clearTimeout(this.pingTimer);
+            this.pingTimer = null;
+          }
           const latency = Date.now() - this.pingStartTime;
           const latDisplay = latency > 0 ? latency : 12;
+          this.options.onPresenceChange?.(true);
           this.options.onPongReceived?.(latDisplay);
-          this.logSys(`🏓 PONG recebido do ESP32! Latência: ${latDisplay}ms`);
+          this.logSys(`🏓 PONG recebido do ESP32! Latência: ${latDisplay}ms | ESP32: ONLINE 🟢`);
         }
         this.options.onEventReceived?.(evt);
       } catch (e) {
-        // Plain string event
         if (payloadStr.includes('PONG')) {
+          if (this.pingTimer) {
+            clearTimeout(this.pingTimer);
+            this.pingTimer = null;
+          }
           const latency = Date.now() - this.pingStartTime;
-          this.options.onPongReceived?.(latency > 0 ? latency : 12);
+          const latDisplay = latency > 0 ? latency : 12;
+          this.options.onPresenceChange?.(true);
+          this.options.onPongReceived?.(latDisplay);
+          this.logSys(`🏓 PONG recebido do ESP32! Latência: ${latDisplay}ms | ESP32: ONLINE 🟢`);
         }
         this.options.onEventReceived?.(payloadStr);
       }
@@ -239,10 +250,29 @@ export class GallopItMqttClient {
     return this.publish(topic, payload);
   }
 
-  public ping(): boolean {
+  private pingTimer: any = null;
+
+  public ping(timeoutMs: number = 3500): boolean {
+    if (this.pingTimer) {
+      clearTimeout(this.pingTimer);
+      this.pingTimer = null;
+    }
+
     this.pingStartTime = Date.now();
     const topic = `gallopit/${this.clientId}/${this.machineId}/cmd/ping`;
-    return this.publish(topic, '{}');
+    const sent = this.publish(topic, '{}');
+
+    if (sent) {
+      this.logSys(`📡 PING enviado para o ESP32. Aguardando PONG (Timeout: ${timeoutMs / 1000}s)...`);
+
+      this.pingTimer = setTimeout(() => {
+        this.pingTimer = null;
+        this.logErr(`⚠️ Sem resposta ao PING após ${timeoutMs / 1000}s. O equipamento ESP32 está OFFLINE ou desligado! 🔴`);
+        this.options.onPresenceChange?.(false);
+      }, timeoutMs);
+    }
+
+    return sent;
   }
 
   public setMode(modo: 'DELAY' | 'AGENDA', intervalo_minutos: number = 5): boolean {
