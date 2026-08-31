@@ -1,0 +1,6 @@
+{
+  "name": "GallopIT - Gestor de Cavalariças IoT",
+  "description": "Painel de gestão IoT para cavalariças inteligentes com controle de baias, sequenciador, agendamento, MQTT e Supabase.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

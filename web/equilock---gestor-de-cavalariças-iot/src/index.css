@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@layer base {
+  h1, h2, h3, h4, .font-heading {
+    font-family: 'Inter', 'Plus Jakarta Sans', system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
+  body {
+    font-family: 'Inter', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    background-color: #ffffff;
+    color: #374151;
+  }
+}
+
+/* Custom Nordic Minimalist Utility Classes */
+.bg-sage-50 {
+  background-color: #f4f8f4;
+}
+.bg-sage-100 {
+  background-color: #e6f4ea;
+}
+.bg-sage-200 {
+  background-color: #d1e6d3;
+}
+.bg-sage-300 {
+  background-color: #b7dbb9;
+}
+.bg-sage-accent {
+  background-color: #a3c9a8;
+}
+.bg-sage-dark {
+  background-color: #7da883;
+}
+
+.text-sage-dark {
+  color: #2e5334;
+}
+.text-sage-accent {
+  color: #558b5b;
+}
+
+.card-nordic {
+  background-color: #ffffff;
+  border: 1px solid #f3f4f6;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease-in-out;
+}
+
+.card-nordic:hover {
+  box-shadow: 0 12px 44px rgba(0, 0, 0, 0.04);
+}
+
+.btn-sage {
+  background-color: #a3c9a8;
+  color: #ffffff;
+  border-radius: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+.btn-sage:hover {
+  background-color: #8fbc8f;
+  transform: translateY(-1px);
+}
+.btn-sage:active {
+  transform: translateY(0);
+}
+
+/* Pulsing dot animation */
+@keyframes pulse-soft {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.15);
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f9fafb;
+}
+::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #d1d5db;
+}
