@@ -1,7 +1,7 @@
 /**
  * GallopIT Firmware v2.3 - ESP32
- * Sistema de Cavalariça Inteligente IoT (Edição Piloto MVP com Modo Fabril Limpo para Treino de Setup)
- * Suporte para Buffer Estendido (1024B), Tópicos Diretos de Box (/box/X/open, /box/X/arm, /box/X/status), Estado Latch & Captive Portal
+ * Sistema de Cavalariça Inteligente IoT (Edição Piloto MVP com Suporte para Timers & Horários em Apps Mobile)
+ * Suporte para Buffer Estendido (1024B), Sequenciador Temporizado, Agendamento NTP, Tópicos Diretos & Captive Portal
  */
 
 #include <WiFi.h>
@@ -113,6 +113,7 @@ void loadStoredPreferences() {
     if (!preferences.isKey("client_id")) preferences.putString("client_id", DEFAULT_CLIENT_ID);
     if (!preferences.isKey("machine_id")) preferences.putString("machine_id", DEFAULT_MACHINE_ID);
     if (!preferences.isKey("modo")) preferences.putString("modo", "DELAY");
+    if (!preferences.isKey("delay_min")) preferences.putInt("delay_min", 5);
 
     wifiSSID = preferences.getString("wifi_ssid", DEFAULT_WIFI_SSID);
     wifiPass = preferences.getString("wifi_pass", DEFAULT_WIFI_PASS);
@@ -122,19 +123,26 @@ void loadStoredPreferences() {
     modoAtivo = preferences.getString("modo", "DELAY");
     intervaloDelayMinutos = preferences.getInt("delay_min", 5);
 
-    // Carrega o estado lógico de cada box (ABERTA vs ARMADA)
     for (int i = 0; i < 4; i++) {
-        String key = "box_" + String(i + 1) + "_open";
-        boxes[i].aberta = preferences.getBool(key.c_str(), false);
+        String keyOpen = "box_" + String(i + 1) + "_open";
+        String keyHora = "box_" + String(i + 1) + "_hora";
+        String keyMin = "box_" + String(i + 1) + "_min";
+        String keyAtivo = "box_" + String(i + 1) + "_ativo";
+
+        boxes[i].aberta = preferences.getBool(keyOpen.c_str(), false);
+        boxes[i].hora = preferences.getInt(keyHora.c_str(), -1);
+        boxes[i].minuto = preferences.getInt(keyMin.c_str(), -1);
+        boxes[i].ativo = preferences.getBool(keyAtivo.c_str(), false);
     }
 
     preferences.end();
 
-    Serial.println(F("[NVS] Configurações carregadas:"));
+    Serial.println(F("[NVS] Configurações carregadas com sucesso:"));
     Serial.print(F(" - Wi-Fi SSID: ")); Serial.println(wifiSSID.length() > 0 ? wifiSSID : "NENHUMA (MODO SETUP)");
     Serial.print(F(" - Client ID: ")); Serial.println(clientId);
     Serial.print(F(" - Machine ID: ")); Serial.println(machineId);
-    Serial.print(F(" - Provisionado: ")); Serial.println(isProvisioned ? "SIM" : "NAO");
+    Serial.print(F(" - Modo Ativo: ")); Serial.println(modoAtivo);
+    Serial.print(F(" - Intervalo Timer: ")); Serial.print(intervaloDelayMinutos); Serial.println(F(" min"));
 }
 
 void saveStoredPreferences() {
@@ -147,10 +155,16 @@ void saveStoredPreferences() {
     preferences.putString("modo", modoAtivo);
     preferences.putInt("delay_min", intervaloDelayMinutos);
 
-    // Salva o estado lógico de cada box
     for (int i = 0; i < 4; i++) {
-        String key = "box_" + String(i + 1) + "_open";
-        preferences.putBool(key.c_str(), boxes[i].aberta);
+        String keyOpen = "box_" + String(i + 1) + "_open";
+        String keyHora = "box_" + String(i + 1) + "_hora";
+        String keyMin = "box_" + String(i + 1) + "_min";
+        String keyAtivo = "box_" + String(i + 1) + "_ativo";
+
+        preferences.putBool(keyOpen.c_str(), boxes[i].aberta);
+        preferences.putInt(keyHora.c_str(), boxes[i].hora);
+        preferences.putInt(keyMin.c_str(), boxes[i].minuto);
+        preferences.putBool(keyAtivo.c_str(), boxes[i].ativo);
     }
 
     preferences.end();
@@ -174,7 +188,6 @@ void setupMQTTTopics() {
 }
 
 bool connectToWiFi() {
-    // Se não existir Wi-Fi guardado, ativa o Portal Cativo AP imediatamente sem esperar
     if (wifiSSID.length() == 0) {
         Serial.println(F("[WiFi] Nenhuma rede Wi-Fi guardada. Ativando Portal de Setup AP imediatamente..."));
         startAPMode();
@@ -360,7 +373,19 @@ void publishFullState() {
         String boxStatusTopic = String(SYSTEM_PREFIX) + "/" + clientId + "/" + machineId + "/box/" + String(i + 1) + "/status";
         String statusStr = boxes[i].aberta ? "ABERTA" : "ARMADA";
         client.publish(boxStatusTopic.c_str(), statusStr.c_str(), true);
+
+        String boxScheduleTopic = String(SYSTEM_PREFIX) + "/" + clientId + "/" + machineId + "/box/" + String(i + 1) + "/schedule/status";
+        String schedStr = boxes[i].ativo ? (String(boxes[i].hora < 10 ? "0" : "") + String(boxes[i].hora) + ":" + String(boxes[i].minuto < 10 ? "0" : "") + String(boxes[i].minuto)) : "DESATIVADO";
+        client.publish(boxScheduleTopic.c_str(), schedStr.c_str(), true);
     }
+
+    String modeTopic = String(SYSTEM_PREFIX) + "/" + clientId + "/" + machineId + "/status/mode";
+    String timerTopic = String(SYSTEM_PREFIX) + "/" + clientId + "/" + machineId + "/status/timer_min";
+    String seqTopic = String(SYSTEM_PREFIX) + "/" + clientId + "/" + machineId + "/status/sequence";
+
+    client.publish(modeTopic.c_str(), modoAtivo.c_str(), true);
+    client.publish(timerTopic.c_str(), String(intervaloDelayMinutos).c_str(), true);
+    client.publish(seqTopic.c_str(), sequenciaEmExecucao ? "EM_EXECUCAO" : "PARADO", true);
 
     String output;
     serializeJson(doc, output);
@@ -524,6 +549,20 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
                 } else if (subPath.endsWith("/arm")) {
                     armBox(bIndex, "APP_DIRECT_ARM");
                     return;
+                } else if (subPath.endsWith("/schedule")) {
+                    if (message == "OFF" || message == "off" || message == "false") {
+                        boxes[bIndex].ativo = false;
+                    } else {
+                        int colonIdx = message.indexOf(':');
+                        if (colonIdx > 0) {
+                            boxes[bIndex].hora = message.substring(0, colonIdx).toInt();
+                            boxes[bIndex].minuto = message.substring(colonIdx + 1).toInt();
+                            boxes[bIndex].ativo = true;
+                        }
+                    }
+                    saveStoredPreferences();
+                    publishFullState();
+                    return;
                 }
             }
         }
@@ -544,9 +583,30 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
             armBox(-1, "MANUAL_ARM_ALL");
         }
     } else if (topicStr.endsWith("/cmd/mode")) {
-        if (!error) {
-            if (doc["modo"].is<const char*>() || doc["modo"].is<String>()) modoAtivo = doc["modo"].as<String>();
+        if (message == "DELAY" || message == "AGENDA") {
+            modoAtivo = message;
+        } else if (!error && (doc["modo"].is<const char*>() || doc["modo"].is<String>())) {
+            modoAtivo = doc["modo"].as<String>();
             if (doc["intervalo_minutos"].is<int>()) intervaloDelayMinutos = doc["intervalo_minutos"].as<int>();
+        }
+        saveStoredPreferences();
+        publishFullState();
+    } else if (topicStr.endsWith("/cmd/start_sequence")) {
+        sequenciaEmExecucao = true;
+        modoAtivo = "DELAY";
+        boxAtualSequencia = 0;
+        proximaAberturaSequenciaMs = millis();
+        publishEvent("SEQUENCE_STARTED", 0, "DELAY_MODE", "Sequência temporizada iniciada.");
+        publishFullState();
+    } else if (topicStr.endsWith("/cmd/stop_sequence")) {
+        sequenciaEmExecucao = false;
+        publishEvent("SEQUENCE_STOPPED", 0, "DELAY_MODE", "Sequência temporizada cancelada.");
+        publishFullState();
+    } else if (topicStr.endsWith("/cmd/timer_min")) {
+        int minVal = message.toInt();
+        if (minVal > 0) {
+            intervaloDelayMinutos = minVal;
+            modoAtivo = "DELAY";
             saveStoredPreferences();
             publishFullState();
         }
@@ -557,6 +617,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
                 if (doc["hora"].is<int>()) boxes[b].hora = doc["hora"].as<int>();
                 if (doc["minuto"].is<int>()) boxes[b].minuto = doc["minuto"].as<int>();
                 if (doc["ativo"].is<bool>()) boxes[b].ativo = doc["ativo"].as<bool>();
+                saveStoredPreferences();
                 publishFullState();
             }
         }
@@ -612,7 +673,7 @@ void setup() {
     Serial.begin(115200);
     delay(100);
     Serial.println(F("\n=============================================="));
-    Serial.println(F(" GallopIT Firmware v2.3 (Clean Factory Mode) "));
+    Serial.println(F(" GallopIT Firmware v2.3 (Timers & Agenda MVP)"));
     Serial.println(F("==============================================\n"));
 
     pinMode(LED_STATUS_PIN, OUTPUT);
