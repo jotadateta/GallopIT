@@ -11,9 +11,9 @@
 #define DEFAULT_CLIENT_ID  "cliente_demo"
 #define DEFAULT_MACHINE_ID "eq_demo_01"
 
-// Credenciais Wi-Fi Padrão / Fallback
-#define DEFAULT_WIFI_SSID  "MEO-5E3030"
-#define DEFAULT_WIFI_PASS  "123456789"
+// Credenciais Wi-Fi Padrão / Fallback (Vazias para forçar Modo Setup no arranque inicial)
+#define DEFAULT_WIFI_SSID  ""
+#define DEFAULT_WIFI_PASS  ""
 
 // Nome do Ponto de Acesso (AP) para Setup Wi-Fi sem fios
 #define AP_SETUP_SSID_PREFIX "GallopIT-Setup-"

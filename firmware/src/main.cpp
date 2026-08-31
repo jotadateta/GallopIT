@@ -1,6 +1,6 @@
 /**
  * GallopIT Firmware v2.3 - ESP32
- * Sistema de Cavalariça Inteligente IoT (Edição Piloto MVP com Suporte Simplificado para Apps MQTT Mobile)
+ * Sistema de Cavalariça Inteligente IoT (Edição Piloto MVP com Modo Fabril Limpo para Treino de Setup)
  * Suporte para Buffer Estendido (1024B), Tópicos Diretos de Box (/box/X/open, /box/X/arm, /box/X/status), Estado Latch & Captive Portal
  */
 
@@ -116,12 +116,23 @@ void loadStoredPreferences() {
 
     wifiSSID = preferences.getString("wifi_ssid", DEFAULT_WIFI_SSID);
     wifiPass = preferences.getString("wifi_pass", DEFAULT_WIFI_PASS);
+
+    // Limpa credenciais antigas de teste (ex: "MEO-5E3030") se existirem na NVS Flash para permitir treino do zero
+    if (wifiSSID == "MEO-5E3030") {
+        wifiSSID = "";
+        wifiPass = "";
+        preferences.putString("wifi_ssid", "");
+        preferences.putString("wifi_pass", "");
+        Serial.println(F("[NVS] Credenciais de teste antigas limpas! Modo Fabril ativado."));
+    }
+
     clientId = preferences.getString("client_id", DEFAULT_CLIENT_ID);
     machineId = preferences.getString("machine_id", DEFAULT_MACHINE_ID);
     isProvisioned = preferences.getBool("provisioned", false);
     modoAtivo = preferences.getString("modo", "DELAY");
     intervaloDelayMinutos = preferences.getInt("delay_min", 5);
 
+    // Carrega o estado lógico de cada box (ABERTA vs ARMADA)
     for (int i = 0; i < 4; i++) {
         String key = "box_" + String(i + 1) + "_open";
         boxes[i].aberta = preferences.getBool(key.c_str(), false);
@@ -130,7 +141,7 @@ void loadStoredPreferences() {
     preferences.end();
 
     Serial.println(F("[NVS] Configurações carregadas:"));
-    Serial.print(F(" - Wi-Fi SSID: ")); Serial.println(wifiSSID);
+    Serial.print(F(" - Wi-Fi SSID: ")); Serial.println(wifiSSID.length() > 0 ? wifiSSID : "NENHUMA (MODO SETUP)");
     Serial.print(F(" - Client ID: ")); Serial.println(clientId);
     Serial.print(F(" - Machine ID: ")); Serial.println(machineId);
     Serial.print(F(" - Provisionado: ")); Serial.println(isProvisioned ? "SIM" : "NAO");
@@ -146,6 +157,7 @@ void saveStoredPreferences() {
     preferences.putString("modo", modoAtivo);
     preferences.putInt("delay_min", intervaloDelayMinutos);
 
+    // Salva o estado lógico de cada box
     for (int i = 0; i < 4; i++) {
         String key = "box_" + String(i + 1) + "_open";
         preferences.putBool(key.c_str(), boxes[i].aberta);
@@ -172,6 +184,13 @@ void setupMQTTTopics() {
 }
 
 bool connectToWiFi() {
+    // Se não existir Wi-Fi guardado, ativa o Portal Cativo AP imediatamente sem esperar
+    if (wifiSSID.length() == 0) {
+        Serial.println(F("[WiFi] Nenhuma rede Wi-Fi guardada. Ativando Portal de Setup AP imediatamente..."));
+        startAPMode();
+        return false;
+    }
+
     Serial.print(F("[WiFi] A tentar conectar a: "));
     Serial.println(wifiSSID);
 
@@ -199,7 +218,7 @@ bool connectToWiFi() {
         return true;
     }
 
-    Serial.println(F("[WiFi] Falha ao conectar. Iniciando Portal de Setup AP Wi-Fi..."));
+    Serial.println(F("[WiFi] Falha ao conectar à rede guardada. Iniciando Portal de Setup AP Wi-Fi..."));
     startAPMode();
     return false;
 }
@@ -223,10 +242,12 @@ void startAPMode() {
     server.onNotFound(handleAPRoot);
     server.begin();
 
-    Serial.println(F("[AP SETUP] Portal Wi-Fi ativo!"));
-    Serial.print(F(" Redes Wi-Fi criadas: ")); Serial.println(apName);
-    Serial.print(F(" Palavra-passe do AP: ")); Serial.println(AP_SETUP_PASS);
-    Serial.println(F(" Aceda a http://192.168.4.1 no seu smartphone para configurar o Wi-Fi."));
+    Serial.println(F("\n=============================================="));
+    Serial.println(F(" [AP SETUP] Portal Cativo Wi-Fi ATIVO!       "));
+    Serial.print(F(" SSID do AP: ")); Serial.println(apName);
+    Serial.print(F(" Password: ")); Serial.println(AP_SETUP_PASS);
+    Serial.println(F(" Aceda a http://192.168.4.1 no telemóvel para configurar."));
+    Serial.println(F("==============================================\n"));
 }
 
 void handleAPRoot() {
@@ -239,9 +260,9 @@ void handleAPRoot() {
                   "<h2>GallopIT - Setup Wi-Fi</h2>"
                   "<form action='/save' method='POST'>"
                   "<label>Nome da Rede Wi-Fi (SSID):</label>"
-                  "<input type='text' name='ssid' value='" + wifiSSID + "' required>"
+                  "<input type='text' name='ssid' value='" + wifiSSID + "' required placeholder='Nome do Wi-Fi do cliente'>"
                   "<label>Palavra-passe do Wi-Fi:</label>"
-                  "<input type='password' name='pass' value='" + wifiPass + "'>"
+                  "<input type='password' name='pass' value='" + wifiPass + "' placeholder='Password do Wi-Fi'>"
                   "<label>Chave Secreta de Auth (Secret Key):</label>"
                   "<input type='password' name='secret' value=''>"
                   "<label>ID do Cliente (Opcional):</label>"
@@ -601,7 +622,7 @@ void setup() {
     Serial.begin(115200);
     delay(100);
     Serial.println(F("\n=============================================="));
-    Serial.println(F(" GallopIT Firmware v2.3 (Mobile App MVP)     "));
+    Serial.println(F(" GallopIT Firmware v2.3 (Clean Factory Mode) "));
     Serial.println(F("==============================================\n"));
 
     pinMode(LED_STATUS_PIN, OUTPUT);
