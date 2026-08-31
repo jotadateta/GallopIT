@@ -28,9 +28,10 @@ Projeto-GallopIT/
 │       ├── config.h                   # Pinos, segredos de auth, Active-LOW e tempos de pulso
 │       └── main.cpp                   # Firmware C++ v2.3 / v1.0 Estável (NVS, MQTT 1024B, Latch, AP)
 ├── web/
-│   └── equilock---gestor-de-cavalariças-iot/ # 🌐 Web App React 19 + Vite 6 + Tailwind + WSS MQTT
+│   └── equilock-app/                  # 🌐 Web App React 19 + Vite 6 + Tailwind + WSS MQTT
 │       ├── src/                       # Código fonte TypeScript (App.tsx, components/, lib/)
 │       ├── package.json               # Dependências da Web App
+│       ├── wrangler.toml              # Configuração Cloudflare Deploy
 │       └── supabase_schema_rbac.sql   # Schema de base de dados Supabase com RBAC
 ├── Python-Tester/
 │   ├── README.md                      # Instruções do utilitário de testes CLI
@@ -43,7 +44,7 @@ Projeto-GallopIT/
 
 ## 🛠️ Especificações Técnicas (v1.0 Estável)
 
-1. **Web App React (Pronta para Cloudflare Pages):**
+1. **Web App React (Pronta para Cloudflare):**
    * Interface moderna com suporte para controlo manual de baias, re-armamento, agendamentos, timers, simulador embutido e consola de auditoria.
    * Conexão via **WebSocket Seguro (WSS)** ao broker MQTT público de alta disponibilidade (`wss://broker.emqx.io:8084/mqtt`).
    * Validação de PING com timeout de 3,5s (sinaliza automaticamente `ESP32: OFFLINE` quando desligado).
@@ -55,18 +56,17 @@ Projeto-GallopIT/
 
 ---
 
-## 🌩️ Como Fazer Deploy da Web App no Cloudflare Pages
+## 🌩️ Como Fazer Deploy da Web App no Cloudflare
 
-Para colocar o site online no Cloudflare Pages:
+Para colocar o site online no Cloudflare:
 
-1. Acede ao painel do **Cloudflare Dashboard** $\rightarrow$ **Workers & Pages** $\rightarrow$ **Create Application** $\rightarrow$ **Pages** $\rightarrow$ **Connect to Git**.
+1. Acede ao painel do **Cloudflare Dashboard** $\rightarrow$ **Workers & Pages** $\rightarrow$ **Create Application** $\rightarrow$ **Connect to Git**.
 2. Seleciona o teu repositório GitHub: `jotadateta/GallopIT`.
 3. Configura os parâmetros de Build:
-   * **Framework preset:** `Vite`
-   * **Root directory:** `web/equilock---gestor-de-cavalariças-iot`
-   * **Build command:** `npm run build`
-   * **Build output directory:** `dist`
-4. Clica em **Save and Deploy**. Em 1 minuto o teu site estará online no domínio `.pages.dev` do Cloudflare!
+   * **Root directory:** `web/equilock-app`
+   * **Build command:** `bun run build` (ou `npm run build`)
+   * **Deploy command:** `npx wrangler deploy`
+4. Clica em **Save and Deploy**. Em 1 minuto o teu site estará online no Cloudflare!
 
 ---
 
