@@ -1,8 +1,13 @@
-# GallopIT: Sistema de Cavalariça Inteligente IoT (v2.3 MVP)
+# GallopIT: Sistema de Cavalariça Inteligente IoT (v1.0 Estável MVP)
 
-Este repositório contém a documentação técnica, especificações, o firmware completo e o manual de instalação para o **GallopIT**, um sistema inteligente e automatizado para gestão de baias (boxes) em cavalariças modernas.
+> **GallopIT v1.0 - Versão Estável de Lançamento MVP**  
+> Repositório oficial contendo o firmware para ESP32, a aplicação Web em React + Vite + Tailwind, o utilitário Python Tester e a documentação completa de campo em LaTeX e Markdown.
 
-O GallopIT combina hardware IoT de alta fiabilidade (ESP32 com relés Active-LOW de 4 segundos e proteção contra brownout) com um protocolo MQTT multi-tenant seguro e suporte direto para **Aplicações Mobile MQTT** (ex: *IoT MQTT Panel*, *MQTT Dash*, *MyMQTT*).
+---
+
+## 🚀 Visão Geral do Sistema
+
+O **GallopIT v1.0** é uma plataforma IoT completa para gestão inteligente de baias (boxes) em cavalariças modernas. O sistema permite controlo remoto das fechaduras solenoides (pulsos de 4s), agendamento por horário (NTP) ou temporizador sequencial, monitorização de presença e histórico de auditoria em tempo real.
 
 ---
 
@@ -10,62 +15,73 @@ O GallopIT combina hardware IoT de alta fiabilidade (ESP32 com relés Active-LOW
 
 ```text
 Projeto-GallopIT/
-├── README.md                          # Visão geral e guia do projeto GallopIT v2.3
+├── README.md                          # Visão geral e guia do projeto GallopIT v1.0 Estável
 ├── docs/
-│   ├── manual_instalacao_cliente_mvp.md # 📘 Guia Completo de Instalação no Cliente & App Mobile MVP
-│   ├── manual_utilizador.md           # Manual técnico e especificações operacionais v2.3
-│   ├── prompt_google_ai_studio.md     # Prompt Mestre para geração da Web App no Google AI Studio
+│   ├── manual_instrucoes.tex          # 📄 Manual Oficial de Instalação e Suporte Telefónico em LaTeX
+│   ├── manual_instalacao_cliente_mvp.md # 📘 Guia de Campo para o Técnico & App Mobile MQTT
+│   ├── manual_utilizador.md           # Especificações operacionais e lógica do sistema
+│   ├── prompt_google_ai_studio.md     # Prompt Mestre para a Web App
 │   └── business_plan.md               # Plano de negócios e modelo de subscrição SaaS
 ├── firmware/
-│   ├── platformio.ini                 # Configuração de compilação PlatformIO (ArduinoJson v7)
+│   ├── platformio.ini                 # Configuração de compilação PlatformIO (ESP32)
 │   └── src/
-│       ├── config.h                   # Pinos, segredos de setup, Active-LOW e tempos de pulso
-│       └── main.cpp                   # Firmware C++ v2.3 (NVS, MQTT 1024B, Tópicos Diretos, Latch)
+│       ├── config.h                   # Pinos, segredos de auth, Active-LOW e tempos de pulso
+│       └── main.cpp                   # Firmware C++ v2.3 / v1.0 Estável (NVS, MQTT 1024B, Latch, AP)
+├── web/
+│   └── equilock---gestor-de-cavalariças-iot/ # 🌐 Web App React 19 + Vite 6 + Tailwind + WSS MQTT
+│       ├── src/                       # Código fonte TypeScript (App.tsx, components/, lib/)
+│       ├── package.json               # Dependências da Web App
+│       └── supabase_schema_rbac.sql   # Schema de base de dados Supabase com RBAC
 ├── Python-Tester/
-│   ├── README.md                      # Instruções de utilização do utilitário de teste
-│   └── gallopit_tester.py             # Script interativo Python para monitorização e validação
+│   ├── README.md                      # Instruções do utilitário de testes CLI
+│   └── gallopit_tester.py             # Script interativo Python para monitorização MQTT
 └── mqtt/
-    └── README.md                      # Especificação e definições do broker MQTT
+    └── README.md                      # Especificação e topologia dos tópicos MQTT
 ```
 
 ---
 
-## 🛠️ Funcionalidades Principais (v2.3 MVP)
+## 🛠️ Especificações Técnicas (v1.0 Estável)
 
-1. **Atalhos para Apps Mobile MQTT (Sem necessidade de Website):**
-   * Tópicos simplificados de atalho (`/box/1/open`, `/box/1/arm`, `/box/1/status`) que permitem configurar botões na app do cliente (iOS/Android) em **30 segundos**!
+1. **Web App React (Pronta para Cloudflare Pages):**
+   * Interface moderna com suporte para controlo manual de baias, re-armamento, agendamentos, timers, simulador embutido e consola de auditoria.
+   * Conexão via **WebSocket Seguro (WSS)** ao broker MQTT público de alta disponibilidade (`wss://broker.emqx.io:8084/mqtt`).
+   * Validação de PING com timeout de 3,5s (sinaliza automaticamente `ESP32: OFFLINE` quando desligado).
 
-2. **Estado Lógico Latch (ARMADA vs ABERTA):**
-   * Quando uma box é acionada (4 segundos de relé), o hardware marca o estado como **`ABERTA`** e guarda na memória flash permanente (**NVS Flash**).
-   * O estado permanece **`ABERTA`** (mesmo se houver corte de energia) até que o tratador feche a baia e clique em **"Armar Box"** (`/arm`).
-
-3. **Proteção Eletrónica & Hardware:**
-   * **Active-LOW Relay Control:** Relés permanecem completamente desligados durante o boot e arranque do microcontrolador.
-   * **Brownout Suppression:** Previne resets por picos elétricos ao ligar o Wi-Fi.
-   * **Pulso Seguro de 4s:** Corta a corrente das bobinas solenoides automaticamente.
-
-4. **Setup Wi-Fi Cativo (Captive Portal):**
-   * Ponto de Acesso `GallopIT-Setup-XXXX` ativado automaticamente quando sem Wi-Fi, com formulário web em `http://192.168.4.1` para configurar Wi-Fi e IDs no local.
+2. **Firmware ESP32:**
+   * **Active-LOW Relay Logic:** Previne disparos acidentais das fechaduras solenoides durante o boot.
+   * **Estado Latch Permanente (NVS Flash):** Preserva o estado `ARMADA` vs `ABERTA` mesmo em caso de falha de energia.
+   * **Captive Portal AP:** Cria a rede `GallopIT-Setup-[MAC]` em `http://192.168.4.1` para configuração manual de Wi-Fi sem necessidade de reprogramação.
 
 ---
 
-## 📡 Referência Rápida dos Tópicos MQTT para Apps Mobile
+## 🌩️ Como Fazer Deploy da Web App no Cloudflare Pages
+
+Para colocar o site online no Cloudflare Pages:
+
+1. Acede ao painel do **Cloudflare Dashboard** $\rightarrow$ **Workers & Pages** $\rightarrow$ **Create Application** $\rightarrow$ **Pages** $\rightarrow$ **Connect to Git**.
+2. Seleciona o teu repositório GitHub: `jotadateta/GallopIT`.
+3. Configura os parâmetros de Build:
+   * **Framework preset:** `Vite`
+   * **Root directory:** `web/equilock---gestor-de-cavalariças-iot`
+   * **Build command:** `npm run build`
+   * **Build output directory:** `dist`
+4. Clica em **Save and Deploy**. Em 1 minuto o teu site estará online no domínio `.pages.dev` do Cloudflare!
+
+---
+
+## 📡 Tabela Rápida de Tópicos MQTT
 
 Tópico base: `gallopit/{client_id}/{machine_id}/...`
 
-| Ação | Tópico | Payload | Função |
+| Ação / Sinal | Tópico | Payload | Função |
 | :--- | :--- | :--- | :--- |
-| **Abrir Box 1** | `.../box/1/open` | `{}` | Dispara solenoide 1 por 4s + marca `ABERTA`. |
+| **Abrir Box 1** | `.../box/1/open` | `{}` | Ativa solenoide 1 (4s) e marca `ABERTA`. |
 | **Armar Box 1** | `.../box/1/arm` | `{}` | Marca Box 1 como `ARMADA`. |
 | **Status Box 1** | `.../box/1/status` | - | Retorna `"ABERTA"` ou `"ARMADA"` (Retained). |
-| **Abrir Todas** | `.../box/all/open` | `{}` | Dispara as 4 boxes em cadeia. |
-| **Armar Todas** | `.../box/all/arm` | `{}` | Marca todas as 4 boxes como `ARMADA`. |
-| **Presença** | `.../status/presence` | - | Retorna `"online"` ou `"offline"` (Retained). |
+| **PING Teste** | `.../cmd/ping` | `{}` | Responde com `PONG` em `< 20ms`. |
+| **Presença** | `.../status/presence` | - | Retorna `"online"` ou `"offline"`. |
+| **Estado Total** | `.../status/state` | - | Payload JSON completo de telemetria (1024B). |
 
 ---
-
-## 🚀 Como Iniciar no Cliente
-
-1. **Gravar Firmware:** Carregar o código `firmware/` na ESP32 via PlatformIO.
-2. **Instalação no Local:** Seguir o [Guia Completo de Instalação no Cliente](docs/manual_instalacao_cliente_mvp.md).
-3. **App Mobile:** Configurar os botões na app **IoT MQTT Panel** no smartphone do cliente usando os tópicos acima.
+*GallopIT v1.0 - Plataforma Autónoma de Cavalariças IoT*
