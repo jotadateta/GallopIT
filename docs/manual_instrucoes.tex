@@ -99,28 +99,35 @@ Se o equipamento for ligado sem credenciais guardadas, o LED piscará lentamente
         \item \textbf{ID da Máquina:} Nome da caixa de controlo (ex: \texttt{Maquina1} ou \texttt{box\_01}).
         \item \textbf{Chave Secreta de Auth:} \texttt{GALLOPIT\_SECURE\_AUTH\_KEY\_2026}
     \end{itemize}
-    \item Clicar em \textbf{"Guardar e Reiniciar"}. A ESP32 guarda na memória Flash NVS e reconeta-se à internet dando **3 piscas verdes fixos** no LED.
+    \item Clicar em \textbf{``Guardar e Reiniciar''}. A ESP32 guarda na memória Flash NVS e reconeta-se à internet dando \textbf{3 piscas verdes fixos} no LED.
 \end{enumerate}
 
 \subsection*{1.3. Tabela de Tópicos MQTT Diretos (v1.0 Estável)}
-O firmware v2.3 permite comandar o equipamento quer por mensagens JSON ricas, quer por tópicos diretos simplificados:
+O firmware v2.3 permite comandar o equipamento quer por mensagens JSON ricas, quer por tópicos diretos simplificados. 
+
+\noindent\textit{Nota: Todos os tópicos têm como prefixo base:} \texttt{gallopit/\{client\}/\{machine\}/}
+
+\vspace{0.2cm}
 
 \begin{table}[h!]
 \centering
 \small
-\begin{tabular}{@{}llll@{}}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}p{3.2cm}p{4.8cm}p{2.2cm}p{6.0cm}@{}}
 \toprule
-\textbf{Ação / Comando} & \textbf{Tópico MQTT} & \textbf{Payload} & \textbf{Função} \\ \midrule
-\textbf{Abrir Box 1} & \texttt{gallopit/\{client\}/\{machine\}/box/1/open} & \texttt{\{\}} & Pulso 4s solenoide + Marca \textcolor{gallopred}{\textbf{ABERTA}} \\
-\textbf{Armar Box 1} & \texttt{gallopit/\{client\}/\{machine\}/box/1/arm} & \texttt{\{\}} & Marca estado como \textcolor{gallopgreen}{\textbf{ARMADA}} \\
-\textbf{Status Box 1} & \texttt{gallopit/\{client\}/\{machine\}/box/1/status} & - & Retorna \textit{ABERTA / ARMADA} (Retained) \\
-\textbf{Iniciar Sequência} & \texttt{gallopit/\{client\}/\{machine\}/cmd/start\_sequence} & \texttt{\{\}} & Inicia abertura temporizada em cadeia \\
-\textbf{Parar Sequência} & \texttt{gallopit/\{client\}/\{machine\}/cmd/stop\_sequence} & \texttt{\{\}} & Cancela a sequência temporizada \\
-\textbf{Ajustar Timer} & \texttt{gallopit/\{client\}/\{machine\}/cmd/timer\_min} & \texttt{"5"}, \texttt{"10"} & Define intervalo entre baias (minutos) \\
-\textbf{Horário Box 1} & \texttt{gallopit/\{client\}/\{machine\}/box/1/schedule} & \texttt{"07:30"} & Agenda abertura automática às 07h30 \\
-\textbf{PING Teste} & \texttt{gallopit/\{client\}/\{machine\}/cmd/ping} & \texttt{\{\}} & Resposta \texttt{PONG} e latência em milissegundos \\ \bottomrule
+\textbf{Ação / Comando} & \textbf{Tópico (Sufixo)} & \textbf{Payload} & \textbf{Função Operacional} \\ \midrule
+\textbf{Abrir Box 1} & \texttt{.../box/1/open} & \texttt{\{\}} & Pulso 4s solenoide + Marca \textcolor{gallopred}{\textbf{ABERTA}} \\
+\textbf{Armar Box 1} & \texttt{.../box/1/arm} & \texttt{\{\}} & Marca estado como \textcolor{gallopgreen}{\textbf{ARMADA}} \\
+\textbf{Status Box 1} & \texttt{.../box/1/status} & \textit{(vazio)} & Retorna \texttt{ABERTA} ou \texttt{ARMADA} (Retained) \\
+\textbf{Abrir TODAS} & \texttt{.../box/all/open} & \texttt{\{\}} & Pulso sequencial de 4s em todas as baias \\
+\textbf{Armar TODAS} & \texttt{.../box/all/arm} & \texttt{\{\}} & Marca todas as 4 baias como \textcolor{gallopgreen}{\textbf{ARMADA}} \\
+\textbf{Iniciar Sequência} & \texttt{.../cmd/start\_sequence} & \texttt{\{\}} & Inicia ciclo temporizado em cadeia \\
+\textbf{Parar Sequência} & \texttt{.../cmd/stop\_sequence} & \texttt{\{\}} & Cancela a sequência temporizada ativa \\
+\textbf{Ajustar Timer} & \texttt{.../cmd/timer\_min} & \texttt{"5"}, \texttt{"10"} & Define intervalo entre baias em minutos \\
+\textbf{Horário Box 1} & \texttt{.../box/1/schedule} & \texttt{"07:30"} & Agenda abertura automática às 07h30 \\
+\textbf{PING Teste} & \texttt{.../cmd/ping} & \texttt{\{\}} & Resposta \texttt{PONG} e latência em milissegundos \\ \bottomrule
 \end{tabular}
-\caption{Tabela de Mapeamento de Tópicos MQTT do GallopIT v1.0}
+\caption{Mapeamento de Tópicos MQTT do GallopIT v1.0 (Prefixo: \texttt{gallopit/\{client\}/\{machine\}/})}
 \end{table}
 
 \newpage
@@ -136,21 +143,24 @@ A aplicação do cliente pode ser acedida de qualquer telemóvel, tablet ou comp
 \end{itemize}
 
 \begin{noteBox}{Sincronização dos Identificadores de Cliente}
-No topo do site da Web App, certificar que o \textbf{Client ID} e o \textbf{Machine ID} correspondem exatamente aos definidos na caixa (ex: Client: \texttt{Emanuel} | Machine: \texttt{Maquina1}). Clicar em **"Aplicar"** para associar o ecrã à caixa física.
+No topo do site da Web App, certificar que o \textbf{Client ID} e o \textbf{Machine ID} correspondem exatamente aos definidos na caixa (ex: Client: \texttt{Emanuel} | Machine: \texttt{Maquina1}). Clicar em \textbf{``Aplicar''} para associar o ecrã à caixa física.
 \end{noteBox}
 
 \subsection*{2.2. Operação Diária: Abrir, Armar e Agendamentos}
 \begin{itemize}[leftmargin=*]
-    \item \textbf{Abertura Manual (Botão "Abrir Box"):} Ativa a fechadura solenoide por **4 segundos exatos** para desengatar a porta. Na App, o estado da baia muda para \textbf{\textcolor{gallopred}{ABERTA}}.
-    \item \textbf{Armar a Baia (Botão "Armar Box"):} Após fechar a porta física da baia com a mão, o tratador clica em "Armar". O estado passa a \textbf{\textcolor{gallopgreen}{ARMADA}} (verde).
-    \item \textbf{Modo Sequencial (Timer):} Escolher o intervalo (ex: 5 min, 10 min) e clicar em **"Iniciar Sequência"**. A caixa 1 abre de imediato, aguarda o tempo definido e abre sequencialmente as baias seguintes.
-    \item \textbf{Modo Agendamento (Hora Fixa):} Definir a hora (ex: \texttt{07:30}) para cada baia e selecionar o modo **AGENDA**. As baias abrirão autonomamente pelo relógio NTP.
+    \item \textbf{Abertura Manual (Botão ``Abrir Box''):} Ativa a fechadura solenoide por \textbf{4 segundos exatos} para desengatar a porta. Na App, o estado da baia muda para \textbf{\textcolor{gallopred}{ABERTA}}.
+    \item \textbf{Armar a Baia (Botão ``Armar Box''):} Após fechar a porta física da baia com a mão, o tratador clica em ``Armar''. O estado passa a \textbf{\textcolor{gallopgreen}{ARMADA}} (verde).
+    \item \textbf{Modo Sequencial (Timer):} Escolher o intervalo (ex: 5 min, 10 min) e clicar em \textbf{``Iniciar Sequência''}. A caixa 1 abre de imediato, aguarda o tempo definido e abre sequencialmente as baias seguintes.
+    \item \textbf{Modo Agendamento (Hora Fixa):} Definir a hora (ex: \texttt{07:30}) para cada baia e selecionar o modo \textbf{AGENDA}. As baias abrirão autonomamente pelo relógio NTP.
 \end{itemize}
 
 \subsection*{2.3. Sinalização por LED no Armário Físico}
+
 \begin{table}[h!]
 \centering
-\begin{tabular}{@{}llp{8.5cm}@{}}
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}p{3.5cm}p{4.5cm}p{8.2cm}@{}}
 \toprule
 \textbf{Padrão do LED} & \textbf{Significado} & \textbf{Estado do Equipamento} \\ \midrule
 🟡 \textbf{Piscar Lento} & Modo AP Setup / Sem Wi-Fi & Equipamento à espera de configuração de rede em \url{http://192.168.4.1}. \\
@@ -170,20 +180,21 @@ No topo do site da Web App, certificar que o \textbf{Client ID} e o \textbf{Mach
 Esta matriz permite diagnosticar e resolver avarias em chamadas telefónicas com o cliente sem necessidade de deslocação.
 
 \begin{alertBox}{Regra de Ouro do Diagnóstico por Telefone}
-Perguntar sempre ao cliente em primeiro lugar: \textbf{"Qual é o ritmo do LED na caixa?"} e \textbf{"Qual o resultado ao clicar no botão PING na App?"}
+Perguntar sempre ao cliente em primeiro lugar: \textbf{``Qual é o ritmo do LED na caixa?''} e \textbf{``Qual o resultado ao clicar no botão PING na App?''}
 \end{alertBox}
 
 \small
 \begin{table}[h!]
 \centering
-\begin{tabular}{@{}p{3.8cm}p{4cm}p{7.2cm}@{}}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}p{3.6cm}p{4.2cm}p{8.4cm}@{}}
 \toprule
 \textbf{Sintoma Relatado} & \textbf{Causa Provável} & \textbf{Instrução de Resolução por Telefone} \\ \midrule
-"Clico no site e a caixa não abre. O PING diz \textbf{ESP32: OFFLINE}." & 1. Falha de energia.\newline 2. PING expirou após 3,5s sem resposta da ESP32. & 1. Pedir ao cliente para verificar se a fonte de 12V está ligada à tomada.\newline 2. Verificar se o LED do armário está aceso/a piscar. \\ \midrule
-"O LED do armário está a \textbf{piscar lentamente}." & A ESP32 perdeu a ligação ao Wi-Fi da cavalariça. & 1. Reiniciar o router Wi-Fi do cliente.\newline 2. Se mudou a password do Wi-Fi, ligar o telemóvel à rede \texttt{GallopIT-Setup} e aceder a \url{http://192.168.4.1} para guardar a nova password. \\ \midrule
-"O solenoide abriu, mas o ecrã continua a dizer \textbf{ABERTA}." & Comportamento normal. A porta foi solta e o solenoide desligou. & Explicar ao cliente que após fechar a porta física da baia, deve clicar no botão **"Armar Box"** na App para o status voltar a ficar verde (ARMADA). \\ \midrule
-"A fechadura faz um estalido mas não liberta a porta." & Pressão excessiva da porta sobre o trinco ou voltagem fraca. & 1. Pedir ao cliente para empurrar ligeiramente a porta com a mão enquanto clica no botão.\newline 2. Confirmar se a fonte de 12V fornece pelo menos 3 Amperes. \\ \midrule
-"Os comandos no site vão para outra caixa." & Divergência no Client ID ou Machine ID no topo do site. & Pedir ao cliente para verificar se o **Client ID** (ex: \texttt{Emanuel}) e o **Machine ID** (ex: \texttt{Maquina1}) coincidem com a etiqueta do armário. \\ \bottomrule
+``Clico no site e a caixa não abre. O PING diz \textbf{ESP32: OFFLINE}.'' & 1. Falha de energia.\newline 2. PING expirou após 3,5s sem resposta da ESP32. & 1. Pedir ao cliente para verificar se a fonte de 12V está ligada à tomada.\newline 2. Verificar se o LED do armário está aceso/a piscar. \\ \midrule
+``O LED do armário está a \textbf{piscar lentamente}.'' & A ESP32 perdeu a ligação ao Wi-Fi da cavalariça. & 1. Reiniciar o router Wi-Fi do cliente.\newline 2. Se mudou a password do Wi-Fi, ligar o telemóvel à rede \texttt{GallopIT-Setup} e aceder a \url{http://192.168.4.1} para guardar a nova password. \\ \midrule
+``O solenoide abriu, mas o ecrã continua a dizer \textbf{ABERTA}.'' & Comportamento normal. A porta foi solta e o solenoide desligou. & Explicar ao cliente que após fechar a porta física da baia, deve clicar no botão \textbf{``Armar Box''} na App para o status voltar a ficar verde (ARMADA). \\ \midrule
+``A fechadura faz um estalido mas não liberta a porta.'' & Pressão excessiva da porta sobre o trinco ou voltagem fraca. & 1. Pedir ao cliente para empurrar ligeiramente a porta com a mão enquanto clica no botão.\newline 2. Confirmar se a fonte de 12V fornece pelo menos 3 Amperes. \\ \midrule
+``Os comandos no site vão para outra caixa.'' & Divergência no Client ID ou Machine ID no topo do site. & Pedir ao cliente para verificar se o \textbf{Client ID} (ex: \texttt{Emanuel}) e o \textbf{Machine ID} (ex: \texttt{Maquina1}) coincidem com a etiqueta do armário. \\ \bottomrule
 \end{tabular}
 \caption{Matriz de Diagnóstico Telefónico Rápido}
 \end{table}
