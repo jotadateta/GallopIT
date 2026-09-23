@@ -24,7 +24,12 @@ import {
   CheckCircle2,
   Calendar,
   SlidersHorizontal,
-  Smartphone
+  Smartphone,
+  User,
+  Eye,
+  EyeOff,
+  LogOut,
+  AlertCircle
 } from 'lucide-react';
 import { GallopItMqttClient } from './lib/mqttClient';
 import { Esp32FullStatePayload } from './types';
@@ -53,6 +58,15 @@ interface LogEntry {
 type TabType = 'boxes' | 'modes' | 'logs' | 'simulator';
 
 export default function App() {
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return localStorage.getItem('gallopit_auth') === 'true';
+  });
+  const [loginUser, setLoginUser] = useState('');
+  const [loginPass, setLoginPass] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
   // Navigation State
   const [activeTab, setActiveTab] = useState<TabType>('boxes');
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -104,8 +118,36 @@ export default function App() {
     setLogs((prev) => [entry, ...prev].slice(0, 150));
   };
 
-  // Initialize and Connect MQTT
+  // Login Handler
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loginUser.trim().toLowerCase() === 'jota' && loginPass.trim() === 'jota123') {
+      setIsAuthenticated(true);
+      localStorage.setItem('gallopit_auth', 'true');
+      setLoginError('');
+      addLog('Sessão iniciada com sucesso como [jota]', 'sys');
+    } else {
+      setLoginError('Credenciais inválidas. Verifique o utilizador e a palavra-passe.');
+    }
+  };
+
+  // Logout Handler
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem('gallopit_auth');
+    if (mqttClientRef.current) {
+      mqttClientRef.current.disconnect();
+    }
+    setLoginUser('');
+    setLoginPass('');
+    setShowSettingsModal(false);
+    setLastPingLatency(null);
+  };
+
+  // Initialize and Connect MQTT (Only when authenticated)
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     const client = new GallopItMqttClient({
       brokerHost: 'broker.emqx.io',
       brokerPort: 8084,
@@ -158,7 +200,7 @@ export default function App() {
     return () => {
       client.disconnect();
     };
-  }, []);
+  }, [isAuthenticated]);
 
   // Handle Client ID or Machine ID Target Changes
   const handleApplyNewTarget = (e?: React.FormEvent) => {
@@ -358,6 +400,121 @@ export default function App() {
     return l.type === logFilter;
   });
 
+  // ==============================================================================
+  // LOGIN SCREEN (ECRÃ DE AUTENTICAÇÃO ANTES DE ACEDER AO DASHBOARD)
+  // ==============================================================================
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#0b1120] text-slate-100 flex items-center justify-center p-4 sm:p-6 font-sans selection:bg-emerald-500 selection:text-slate-950">
+        <div className="w-full max-w-sm sm:max-w-md bg-[#162032] border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative overflow-hidden">
+          
+          {/* Ambient decorative glow */}
+          <div className="absolute -top-12 -right-12 w-36 h-36 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute -bottom-12 -left-12 w-36 h-36 bg-teal-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          {/* Header & Logo */}
+          <div className="text-center space-y-3">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-slate-950 shadow-lg shadow-emerald-500/20">
+              <ShieldCheck className="w-8 h-8 stroke-[2.3]" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight font-heading">
+                GallopIT <span className="text-emerald-400 font-mono text-sm font-semibold">v1.0</span>
+              </h1>
+              <p className="text-xs text-slate-400 mt-1">
+                Controlo Seguro de Cavalariças IoT
+              </p>
+            </div>
+          </div>
+
+          {/* Error Alert */}
+          {loginError && (
+            <div className="p-3.5 rounded-2xl bg-rose-950/80 border border-rose-600/70 text-rose-300 text-xs flex items-center space-x-2 animate-in fade-in duration-150">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+              <span>{loginError}</span>
+            </div>
+          )}
+
+          {/* Login Form */}
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
+                Utilizador
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                  <User className="w-4 h-4" />
+                </div>
+                <input
+                  type="text"
+                  required
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  value={loginUser}
+                  onChange={(e) => {
+                    setLoginUser(e.target.value);
+                    if (loginError) setLoginError('');
+                  }}
+                  placeholder="Nome de utilizador"
+                  className="w-full pl-10 pr-3.5 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
+                Palavra-passe
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={loginPass}
+                  onChange={(e) => {
+                    setLoginPass(e.target.value);
+                    if (loginError) setLoginError('');
+                  }}
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-11 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 hover:text-slate-300 cursor-pointer"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-extrabold text-sm flex items-center justify-center space-x-2 transition-all shadow-lg active:scale-95 cursor-pointer touch-manipulation mt-2"
+            >
+              <Lock className="w-4 h-4 stroke-[2.5]" />
+              <span>Entrar no Sistema</span>
+            </button>
+          </form>
+
+          {/* Footer note */}
+          <div className="text-center pt-2">
+            <span className="text-[11px] text-slate-400 font-mono">
+              Acesso protegido contra comandos não autorizados
+            </span>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
+  // ==============================================================================
+  // AUTHENTICATED DASHBOARD
+  // ==============================================================================
   return (
     <div className="min-h-screen bg-[#0b1120] text-slate-100 flex flex-col justify-between font-sans selection:bg-emerald-500 selection:text-slate-950 pb-24 md:pb-10">
 
@@ -402,7 +559,7 @@ export default function App() {
           </div>
 
           {/* Status Badges & Quick Action Buttons */}
-          <div className="flex items-center space-x-2 shrink-0">
+          <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
             
             {/* ESP32 Presence Indicator */}
             <div
@@ -456,6 +613,15 @@ export default function App() {
               title="Definições e Alvo MQTT"
             >
               <Settings className="w-4 h-4 text-emerald-400" />
+            </button>
+
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              className="p-2 sm:p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-rose-400 border border-slate-700 transition-all active:scale-95 cursor-pointer touch-manipulation"
+              title="Terminar Sessão"
+            >
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -1105,7 +1271,7 @@ export default function App() {
               </div>
               <button
                 onClick={() => setShowSettingsModal(false)}
-                className="p-1 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                className="p-1 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1160,6 +1326,18 @@ export default function App() {
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Aplicar e Ligar</span>
+                </button>
+              </div>
+
+              {/* Logout Option in Settings */}
+              <div className="pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="w-full py-2.5 px-3 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 font-bold text-xs transition-colors cursor-pointer flex items-center justify-center space-x-2"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Terminar Sessão (Sair da Conta)</span>
                 </button>
               </div>
             </form>
