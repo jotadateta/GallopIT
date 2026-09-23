@@ -32,8 +32,12 @@ No local do cliente:
 2. **Fechaduras Solenoides:**
    * Fase/Positivo 12V $\rightarrow$ Pino **`NO`** *(Normally Open)* de cada relé.
    * Saída Pino **`COM`** do relé $\rightarrow$ Polo positivo da fechadura solenoide.
-   * Polo negativo do solenoide $\rightarrow$ GND Comum da fonte de 12V.
-3. **LED de Sinalização:** Garante que o LED de sinalização no pino GPIO 2 (ou painel da caixa) está visível.
+3. **Pinos GPIO do ESP32 para o Módulo de Relés:**
+   * **Box 1:** GPIO 17 $\rightarrow$ Entrada `IN1`
+   * **Box 2:** GPIO 5 $\rightarrow$ Entrada `IN2`
+   * **Box 3:** GPIO 18 $\rightarrow$ Entrada `IN3`
+   * **Box 4:** GPIO 19 $\rightarrow$ Entrada `IN4`
+4. **LED de Sinalização:** Garante que o LED de sinalização no pino GPIO 2 (ou painel da caixa) está visível.
 
 ---
 

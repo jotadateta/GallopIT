@@ -80,6 +80,13 @@ Este capítulo descreve os procedimentos de instalação física da caixa de con
         \item Pino \textbf{COM} de cada relé $\rightarrow$ Polo Positivo (+) do solenoide correspondente (Boxes 1 a 4).
         \item Polo Negativo (-) de todas as fechaduras $\rightarrow$ Barramento de \textbf{GND Comum} da fonte de 12V e da ESP32.
     \end{itemize}
+    \item \textbf{Mapeamento dos Pinos GPIO no ESP32:}
+    \begin{itemize}
+        \item \textbf{Box 1 (Prateleira 1):} Pino \textbf{GPIO 17} $\rightarrow$ Entrada \texttt{IN1} do módulo de relés.
+        \item \textbf{Box 2 (Prateleira 2):} Pino \textbf{GPIO 5} $\rightarrow$ Entrada \texttt{IN2} do módulo de relés.
+        \item \textbf{Box 3 (Prateleira 3):} Pino \textbf{GPIO 18} $\rightarrow$ Entrada \texttt{IN3} do módulo de relés.
+        \item \textbf{Box 4 (Prateleira 4):} Pino \textbf{GPIO 19} $\rightarrow$ Entrada \texttt{IN4} do módulo de relés.
+    \end{itemize}
     \item \textbf{LED de Sinalização:} Ligar o polo positivo (Anodo) do LED ao pino \textbf{GPIO 2} através de uma resistência em série de $220\,\Omega$ a $330\,\Omega$, e o polo negativo (Catodo) ao \textbf{GND}.
 \end{itemize}
 
