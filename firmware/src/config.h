@@ -24,7 +24,7 @@
 const bool RELAY_ACTIVE_LOW = true; 
 
 // --- Definições de Pinos do ESP32 ---
-const int RELAY_PINS[4] = {18, 19, 21, 22}; // Pinos das Boxes 1, 2, 3 e 4
+const int RELAY_PINS[4] = {17, 5, 18, 19}; // Pinos das Boxes 1, 2, 3 e 4 (GPIO 17, 5, 18, 19)
 const int LED_STATUS_PIN = 2;               // LED de sinalização de estado do armário
 
 // --- Temporizações de Segurança ---
